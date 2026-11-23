@@ -1,7 +1,11 @@
 import SwiftUI
 
 struct ArtistDetailView: View {
-    let id: Int
+    private let input: Artist
+
+    init(artist: Artist) {
+        input = artist
+    }
 
     @Environment(NeteaseAPI.self) private var api
     @Environment(PlayerStore.self) private var player
@@ -149,7 +153,10 @@ struct ArtistDetailView: View {
     private func load() async {
         phase = .loading
         do {
-            (artist, songs, albums) = try await api.artist(id: id)
+            (artist, songs, albums) = try await api.artist(
+                id: input.id,
+                mid: input.mid
+            )
             if let artist {
                 isFollowed = artist.isFollowed || library.contains(artist: artist)
             }

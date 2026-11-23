@@ -274,7 +274,7 @@ struct AlbumDetailView: View {
                 }
 
                 if let artist = displayedAlbum.artists.first {
-                    NavigationLink(value: MusicRoute.artist(artist.id)) {
+                    NavigationLink(value: MusicRoute.artist(artist)) {
                         Label("ui.artist.view", systemImage: "person")
                     }
                 }

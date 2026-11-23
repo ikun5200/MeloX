@@ -88,7 +88,7 @@ enum MusicRoute: Hashable {
     case toplist(PlaylistRouteContext)
     case playlistCategory(String)
     case album(AlbumRouteContext)
-    case artist(Int)
+    case artist(Artist)
     case podcasts
     case podcast(Podcast)
     case podcastCategory(PodcastCategory)
@@ -137,8 +137,8 @@ enum MusicRoute: Hashable {
             "playlist-category-\(category)"
         case .album(let context):
             "album-\(context.id)"
-        case .artist(let id):
-            "artist-\(id)"
+        case .artist(let artist):
+            "artist-\(artist.id)-\(artist.mid)"
         case .podcasts:
             "podcasts"
         case .podcast(let podcast):
@@ -268,8 +268,8 @@ private struct MusicRouteDestination: View {
             PlaylistCategoryView(category: category)
         case .album(let context):
             AlbumDetailView(context: context)
-        case .artist(let id):
-            ArtistDetailView(id: id)
+        case .artist(let artist):
+            ArtistDetailView(artist: artist)
         case .podcasts:
             PodcastHomeView()
         case .podcast(let podcast):

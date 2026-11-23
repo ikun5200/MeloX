@@ -179,7 +179,7 @@ struct SearchView: View {
                 }
             case .artists:
                 ForEach(artists) { artist in
-                    NavigationLink(value: MusicRoute.artist(artist.id)) {
+                    NavigationLink(value: MusicRoute.artist(artist)) {
                         SearchMediaRow(
                             title: artist.name,
                             subtitle: artist.aliases.first,
@@ -187,7 +187,7 @@ struct SearchView: View {
                             circular: true
                         )
                     }
-                    .musicMatchedTransitionSource(for: MusicRoute.artist(artist.id))
+                    .musicMatchedTransitionSource(for: MusicRoute.artist(artist))
                 }
             case .playlists:
                 ForEach(playlists) { playlist in

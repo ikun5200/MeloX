@@ -73,4 +73,51 @@ nonisolated enum QQMusicMapper {
             dirid: value.dirid
         )
     }
+
+    static func playlist(_ value: QQPlaylistDetail) -> Playlist {
+        let songs = value.songs.map(song)
+        return Playlist(
+            id: value.id,
+            name: value.name,
+            coverURLString: value.coverURL,
+            playlistDescription: value.description,
+            trackCount: value.trackCount,
+            playCount: value.playCount,
+            creator: UserSummary(
+                userID: value.creatorID,
+                nickname: value.creatorName ?? ""
+            ),
+            tracks: songs,
+            trackIDs: songs.map { TrackReference(id: $0.id) },
+            dirid: value.dirid
+        )
+    }
+
+    static func albumDetail(
+        _ value: QQAlbumDetail
+    ) -> (Album, [Song]) {
+        (album(value.album), value.songs.map(song))
+    }
+
+    static func artistDetail(
+        _ value: QQArtistDetail
+    ) -> (Artist, [Song], [Album]) {
+        (
+            artist(value.artist),
+            value.songs.map(song),
+            value.albums.map(album)
+        )
+    }
+
+    static func toplist(_ value: QQToplist) -> Playlist {
+        Playlist(
+            id: value.id,
+            name: value.name,
+            coverURLString: value.coverURL,
+            playlistDescription: value.description,
+            trackCount: value.trackCount,
+            playCount: value.playCount,
+            toplistType: "qq"
+        )
+    }
 }

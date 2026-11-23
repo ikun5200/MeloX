@@ -116,6 +116,314 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
         return Array(suggestions.prefix(8))
     }
 
+    // MARK: - Detail endpoints
+
+    func playlistDetail(
+        id: Int,
+        limit: Int = 100,
+        offset: Int = 0
+    ) async throws -> QQPlaylistDetail {
+        let session = try await anonymousSession()
+        let data = try await cgiCall(
+            module: "music.srfDissInfo.DissInfo",
+            method: "CgiGetDiss",
+            parameter: [
+                "disstid": id,
+                "dirid": 0,
+                "tag": true,
+                "song_begin": offset,
+                "song_num": limit,
+                "userinfo": true,
+                "orderlist": true,
+                "onlysonglist": false,
+            ],
+            session: session
+        )
+
+        let info = Self.dictionary(data["dirinfo"]) ?? [:]
+        let creator = Self.dictionary(info["creator"]) ?? [:]
+        let songs = QQMusicSearchParser.songs(
+            Self.dictionaryArray(data["songlist"])
+        )
+        let total = Self.int(data["total_song_num"])
+            ?? Self.int(info["songnum"])
+            ?? songs.count
+
+        return QQPlaylistDetail(
+            id: Self.int(info["id"]) ?? id,
+            dirid: Self.int(info["dirid"]) ?? 0,
+            name: Self.string(info["title"])
+                ?? Self.string(info["dissname"])
+                ?? "",
+            coverURL: Self.string(info["picurl"])
+                ?? Self.string(info["cover"]),
+            description: Self.string(info["desc"]),
+            trackCount: Self.int(info["songnum"]) ?? total,
+            playCount: Self.int(info["listennum"]) ?? 0,
+            creatorName: Self.string(creator["nick"])
+                ?? Self.string(info["nick"]),
+            creatorID: Self.int(creator["musicid"])
+                ?? Self.int(info["host_uin"])
+                ?? 0,
+            songs: songs,
+            total: total,
+            hasMore: (Self.int(data["hasmore"]) ?? 0) == 1
+                || total > offset + songs.count
+        )
+    }
+
+    func albumDetail(
+        id: Int,
+        limit: Int = 100,
+        offset: Int = 0
+    ) async throws -> QQAlbumDetail {
+        let session = try await anonymousSession()
+        let detail = try await cgiCall(
+            module: "music.musichallAlbum.AlbumInfoServer",
+            method: "GetAlbumDetail",
+            parameter: ["albumId": id],
+            session: session
+        )
+        let basic = Self.dictionary(detail["basicInfo"]) ?? [:]
+        let singerContainer = Self.dictionary(detail["singer"]) ?? [:]
+        let singers = Self.dictionaryArray(singerContainer["singerList"])
+
+        var artists = QQMusicSearchParser.artists(singers)
+        if artists.isEmpty,
+           let singer = QQMusicSearchParser.artist(basic) {
+            artists = [singer]
+        }
+        let album = QQMusicSearchParser.album(basic) ?? QQSearchAlbum(
+            id: id,
+            mid: Self.string(basic["albumMid"]) ?? "",
+            name: Self.string(basic["albumName"]) ?? "",
+            coverURL: nil,
+            artists: artists,
+            publishDate: Self.string(basic["publishDate"])
+        )
+        let resolvedAlbum = QQSearchAlbum(
+            id: album.id,
+            mid: album.mid,
+            name: album.name,
+            coverURL: album.coverURL,
+            artists: album.artists.isEmpty ? artists : album.artists,
+            publishDate: album.publishDate
+                ?? Self.string(basic["publishDate"])
+        )
+
+        let songsData = try await cgiCall(
+            module: "music.musichallAlbum.AlbumSongList",
+            method: "GetAlbumSongList",
+            parameter: [
+                "albumId": id,
+                "begin": offset,
+                "num": limit,
+            ],
+            session: session
+        )
+        let songInfos = Self.dictionaryArray(songsData["songList"])
+            .compactMap { Self.dictionary($0["songInfo"]) }
+
+        return QQAlbumDetail(
+            album: resolvedAlbum,
+            description: Self.string(basic["desc"]),
+            publishDate: Self.string(basic["publishDate"]),
+            songs: QQMusicSearchParser.songs(songInfos)
+        )
+    }
+
+    func artistDetail(
+        mid: String,
+        songLimit: Int = 100,
+        albumLimit: Int = 100
+    ) async throws -> QQArtistDetail {
+        let session = try await anonymousSession()
+        let infoData = try await cgiCall(
+            module: "music.UnifiedHomepage.UnifiedHomepageSrv",
+            method: "GetHomepageHeader",
+            parameter: ["SingerMid": mid],
+            session: session
+        )
+        let info = Self.dictionary(infoData["Info"]) ?? [:]
+        let singer = Self.dictionary(info["Singer"])
+            ?? Self.dictionary(info["BaseInfo"])
+            ?? [:]
+
+        let artist = QQMusicSearchParser.artist(singer)
+            ?? QQSearchArtist(
+                id: Self.int(singer["SingerID"]) ?? 0,
+                mid: mid,
+                name: Self.string(singer["Name"]) ?? "",
+                avatarURL: Self.string(singer["Avatar"])
+                    ?? Self.string(singer["SingerPic"]),
+                isFollowed: false
+            )
+
+        let songsData = try await cgiCall(
+            module: "musichall.song_list_server",
+            method: "GetSingerSongList",
+            parameter: [
+                "singerMid": mid,
+                "order": 1,
+                "number": songLimit,
+                "begin": 0,
+            ],
+            session: session
+        )
+        let songInfos = Self.dictionaryArray(songsData["songList"])
+            .compactMap { Self.dictionary($0["songInfo"]) }
+
+        let albumsData = try await cgiCall(
+            module: "music.musichallAlbum.AlbumListServer",
+            method: "GetAlbumList",
+            parameter: [
+                "singerMid": mid,
+                "order": 1,
+                "number": albumLimit,
+                "begin": 0,
+            ],
+            session: session
+        )
+        let albums = QQMusicSearchParser.albums(
+            Self.dictionaryArray(albumsData["albumList"])
+        )
+
+        let description = await artistDescription(
+            mid: mid,
+            session: session
+        )
+
+        return QQArtistDetail(
+            artist: QQSearchArtist(
+                id: artist.id,
+                mid: artist.mid.isEmpty ? mid : artist.mid,
+                name: artist.name,
+                avatarURL: artist.avatarURL,
+                isFollowed: artist.isFollowed
+            ),
+            description: description,
+            songs: QQMusicSearchParser.songs(songInfos),
+            albums: albums
+        )
+    }
+
+    func newAlbums(
+        area: Int,
+        limit: Int = 30,
+        offset: Int = 0
+    ) async throws -> [QQSearchAlbum] {
+        let session = try await anonymousSession()
+        let data = try await cgiCall(
+            module: "newalbum.NewAlbumServer",
+            method: "get_new_album_info",
+            parameter: [
+                "area": area,
+                "num": limit,
+                "start": offset,
+            ],
+            session: session
+        )
+        return QQMusicSearchParser.albums(
+            Self.dictionaryArray(data["albums"])
+        )
+    }
+
+    func recommendedPlaylists(
+        limit: Int = 20,
+        offset: Int = 0
+    ) async throws -> [QQSearchPlaylist] {
+        let session = try await anonymousSession()
+        let data = try await cgiCall(
+            module: "music.playlist.PlaylistSquare",
+            method: "GetRecommendFeed",
+            parameter: ["From": offset, "Size": limit],
+            session: session
+        )
+
+        return Self.dictionaryArray(data["List"]).compactMap { item in
+            guard let playlist = Self.dictionary(item["Playlist"]),
+                  let basic = Self.dictionary(playlist["basic"]) else {
+                return nil
+            }
+            let cover = Self.dictionary(basic["cover"])
+            let creator = Self.dictionary(basic["creator"])
+            let id = Self.int(basic["tid"])
+                ?? Self.int(basic["id"])
+                ?? 0
+            let name = Self.string(basic["title"])
+                ?? Self.string(basic["name"])
+                ?? ""
+            guard id > 0, !name.isEmpty else { return nil }
+            return QQSearchPlaylist(
+                id: id,
+                dirid: Self.int(basic["dirid"]) ?? 0,
+                name: name,
+                coverURL: Self.string(cover?["small_url"])
+                    ?? Self.string(cover?["medium_url"]),
+                trackCount: Self.int(basic["song_cnt"])
+                    ?? Self.int(basic["songnum"])
+                    ?? 0,
+                playCount: Self.int(basic["listennum"]) ?? 0,
+                creatorName: Self.string(creator?["nick"])
+            )
+        }
+    }
+
+    func toplists() async throws -> [QQToplist] {
+        let session = try await anonymousSession()
+        let data = try await cgiCall(
+            module: "music.musicToplist.Toplist",
+            method: "GetAll",
+            parameter: [:],
+            session: session
+        )
+
+        var result: [QQToplist] = []
+        for group in Self.dictionaryArray(data["group"]) {
+            for item in Self.dictionaryArray(group["toplist"]) {
+                let id = Self.int(item["topId"]) ?? 0
+                let name = Self.string(item["title"]) ?? ""
+                guard id > 0, !name.isEmpty else { continue }
+                result.append(
+                    QQToplist(
+                        id: id,
+                        name: name,
+                        coverURL: Self.string(item["frontPicUrl"])
+                            ?? Self.string(item["headPicUrl"]),
+                        description: Self.string(item["intro"]),
+                        trackCount: Self.int(item["totalNum"]) ?? 0,
+                        playCount: Self.int(item["listenNum"]) ?? 0
+                    )
+                )
+            }
+        }
+        return result
+    }
+
+    private func artistDescription(
+        mid: String,
+        session: (uid: String, sid: String)
+    ) async -> String? {
+        guard let data = try? await cgiCall(
+            module: "music.musichallSinger.SingerInfoInter",
+            method: "GetSingerDetail",
+            parameter: [
+                "singer_mids": [mid],
+                "group_singer": true,
+                "wiki_singer": true,
+                "ex_singer": true,
+                "pic": true,
+                "photos": true,
+            ],
+            session: session
+        ) else {
+            return nil
+        }
+        let list = Self.dictionaryArray(data["singer_list"])
+        let extra = Self.dictionary(list.first?["ex_info"])
+        return Self.string(extra?["desc"])
+    }
+
     // MARK: - Search transports
 
     private func searchSongs(
@@ -385,6 +693,34 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
                 code: (error as? URLError)?.errorCode ?? -1
             )
         }
+    }
+
+    // MARK: - Parsing helpers
+
+    private static func dictionary(_ value: Any?) -> [String: Any]? {
+        value as? [String: Any]
+    }
+
+    private static func dictionaryArray(_ value: Any?) -> [[String: Any]] {
+        value as? [[String: Any]] ?? []
+    }
+
+    private static func int(_ value: Any?) -> Int? {
+        if let value = value as? Int { return value }
+        if let value = value as? NSNumber { return value.intValue }
+        if let value = value as? String { return Int(value) }
+        return nil
+    }
+
+    private static func string(_ value: Any?) -> String? {
+        if let value = value as? String {
+            let trimmed = value.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        if let value = value as? NSNumber { return value.stringValue }
+        return nil
     }
 
     // MARK: - Identifiers

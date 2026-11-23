@@ -180,7 +180,7 @@ struct NowPlayingSongActions: View {
                 }
                 if let artist = song.artists.first, song.artists.count == 1 {
                     Button {
-                        openMusicRoute(.artist(artist.id))
+                        openMusicRoute(.artist(artist))
                     } label: {
                         Label(
                             L10n.format("ui.artist.go_to", artist.name),
@@ -191,7 +191,7 @@ struct NowPlayingSongActions: View {
                     Menu {
                         ForEach(song.artists) { artist in
                             Button {
-                                openMusicRoute(.artist(artist.id))
+                                openMusicRoute(.artist(artist))
                             } label: {
                                 Text(artist.name)
                             }

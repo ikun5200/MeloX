@@ -185,6 +185,7 @@ nonisolated enum QQMusicSearchParser {
 
         let artistValues = (item["singer"] as? [Any])
             ?? (item["singer_list"] as? [Any])
+            ?? (item["singers"] as? [Any])
             ?? []
         let artists = artistValues.compactMap { value -> QQSearchArtist? in
             if let dictionary = value as? [String: Any] {

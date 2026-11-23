@@ -36,6 +36,19 @@ nonisolated enum LXQualityMapping {
         return filtered.isEmpty ? preference : filtered
     }
 
+    static func quality(for value: String) -> MusicQuality? {
+        switch value.lowercased() {
+        case "128k": .standard
+        case "320k": .high
+        case "flac": .lossless
+        case "flac24bit", "hires": .hiResolution
+        case "atmos": .highDefinitionSurround
+        case "atmos_plus": .immersiveSurround
+        case "master": .ultraClearMaster
+        default: nil
+        }
+    }
+
     static func bitrate(for quality: String) -> Int? {
         switch quality.lowercased() {
         case "128k": 128_000

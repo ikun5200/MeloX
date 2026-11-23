@@ -44,6 +44,20 @@ final class LXPlaybackResolver {
         self.session = session
     }
 
+    var supportedQualities: [MusicQuality] {
+        let declared = Set(
+            store.enabledQQSources.flatMap { $0.qqQualities }
+        )
+        guard !declared.isEmpty else {
+            return MusicQuality.allCases
+        }
+        let mapped = declared.compactMap {
+            LXQualityMapping.quality(for: $0)
+        }
+        guard !mapped.isEmpty else { return MusicQuality.allCases }
+        return MusicQuality.allCases.filter { mapped.contains($0) }
+    }
+
     func resolve(
         song: Song,
         quality: MusicQuality

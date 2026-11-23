@@ -70,6 +70,10 @@ final class PlayerStore {
 
     var availablePlaybackQualities: [MusicQuality] {
         guard currentSong != nil else { return [] }
+        let sourceQualities = api.sourcePlaybackQualities
+        if !sourceQualities.isEmpty {
+            return sourceQualities
+        }
         guard !isResolvingCurrentSongAudioAvailability else { return [] }
         if currentSongAudioAvailability.isKnown {
             return MusicQuality.allCases.filter { quality in
@@ -1232,7 +1236,8 @@ final class PlayerStore {
                     return downloadedSource
                 }
                 isUsingDownloadedSource = false
-                if let cachedDetailedSong {
+                if !api.isUsingSourceResolver,
+                   let cachedDetailedSong {
                     return try await api.playbackSource(for: cachedDetailedSong)
                 }
                 if !song.mid.isEmpty {
@@ -2007,6 +2012,12 @@ final class PlayerStore {
         generation: Int
     ) {
         audioAvailabilityTask?.cancel()
+        if api.isUsingSourceResolver {
+            currentSongAudioAvailability = .unknown
+            isResolvingCurrentSongAudioAvailability = false
+            audioAvailabilityTask = nil
+            return
+        }
         if let detailedSong = detailedPlaybackSongs[song.id] {
             currentSongAudioAvailability =
                 detailedSong.audioAvailability

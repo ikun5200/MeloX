@@ -118,6 +118,12 @@ final class NeteaseAPI {
     }
 
     func recommendedPlaylists(limit: Int = 10) async throws -> [Playlist] {
+        if resolver != nil {
+            let playlists = try await qq.recommendedPlaylists(
+                limit: limit
+            )
+            return playlists.map(QQMusicMapper.playlist)
+        }
         let response: PersonalizedResponse = try await client.eapi(
             "/api/personalized/playlist",
             data: ["limit": limit, "total": true, "n": 1_000]
@@ -126,6 +132,13 @@ final class NeteaseAPI {
     }
 
     func newAlbums(limit: Int = 10, area: String? = nil) async throws -> [Album] {
+        if resolver != nil {
+            let albums = try await qq.newAlbums(
+                area: Self.qqArea(for: area ?? settings.musicArea),
+                limit: limit
+            )
+            return albums.map(QQMusicMapper.album)
+        }
         let response: NewAlbumsResponse = try await client.eapi(
             "/api/album/new",
             data: ["limit": limit, "offset": 0, "total": true, "area": area ?? settings.musicArea]
@@ -134,6 +147,10 @@ final class NeteaseAPI {
     }
 
     func toplists() async throws -> [Playlist] {
+        if resolver != nil {
+            let toplists = try await qq.toplists()
+            return toplists.map(QQMusicMapper.toplist)
+        }
         let response: ToplistsResponse = try await client.eapi("/api/toplist")
         return response.list
     }
@@ -141,6 +158,16 @@ final class NeteaseAPI {
     func topArtists() async throws -> [Artist] {
         let response: ArtistToplistResponse = try await client.eapi("/api/toplist/artist")
         return response.list.artists
+    }
+
+    private static func qqArea(for area: String) -> Int {
+        switch area.uppercased() {
+        case "ZH", "CN", "HK", "TW": 1
+        case "EA", "EU", "US": 3
+        case "KR": 4
+        case "JP": 5
+        default: 1
+        }
     }
 
     func playlists(category: String, offset: Int = 0, limit: Int = 50) async throws -> [Playlist] {
@@ -168,6 +195,13 @@ final class NeteaseAPI {
         id: Int,
         trackLimit: Int? = 100
     ) async throws -> Playlist {
+        if resolver != nil {
+            let detail = try await qq.playlistDetail(
+                id: id,
+                limit: min(max(trackLimit ?? 100, 1), 100)
+            )
+            return QQMusicMapper.playlist(detail)
+        }
         let embeddedTrackCount = min(max(trackLimit ?? 100, 0), 100)
         let response: PlaylistDetailResponse = try await client.eapi(
             "/api/v6/playlist/detail",
@@ -197,6 +231,10 @@ final class NeteaseAPI {
     }
 
     func album(id: Int) async throws -> (Album, [Song]) {
+        if resolver != nil {
+            let detail = try await qq.albumDetail(id: id)
+            return QQMusicMapper.albumDetail(detail)
+        }
         let response: AlbumDetailResponse = try await client.eapi("/api/v1/album/\(id)")
         return (response.album, response.songs)
     }
@@ -219,7 +257,17 @@ final class NeteaseAPI {
         try validate(responseCode: response.code, message: response.message)
     }
 
-    func artist(id: Int) async throws -> (Artist, [Song], [Album]) {
+    func artist(
+        id: Int,
+        mid: String? = nil
+    ) async throws -> (Artist, [Song], [Album]) {
+        if resolver != nil {
+            guard let mid, !mid.isEmpty else {
+                throw APIError.invalidResponse
+            }
+            let detail = try await qq.artistDetail(mid: mid)
+            return QQMusicMapper.artistDetail(detail)
+        }
         let detail: ArtistDetailResponse = try await client.eapi("/api/v1/artist/\(id)")
         let albums: ArtistAlbumsResponse = try await client.eapi(
             "/api/artist/albums/\(id)",

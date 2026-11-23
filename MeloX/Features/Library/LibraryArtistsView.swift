@@ -11,7 +11,7 @@ struct LibraryArtistsView: View {
         }
 
         List(artists) { artist in
-            NavigationLink(value: MusicRoute.artist(artist.id)) {
+            NavigationLink(value: MusicRoute.artist(artist)) {
                 HStack(spacing: 12) {
                     ArtworkImage(url: artist.artworkURL, cornerRadius: 1_000)
                         .frame(width: 54, height: 54)
@@ -19,7 +19,7 @@ struct LibraryArtistsView: View {
                         .lineLimit(1)
                 }
             }
-            .musicMatchedTransitionSource(for: .artist(artist.id))
+            .musicMatchedTransitionSource(for: .artist(artist))
         }
         .listStyle(.plain)
         .refreshable { await library.refresh(force: true) }

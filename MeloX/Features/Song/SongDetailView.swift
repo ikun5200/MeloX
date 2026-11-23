@@ -169,10 +169,10 @@ struct SongDetailView: View {
             }
 
             ForEach(song.artists) { artist in
-                NavigationLink(value: MusicRoute.artist(artist.id)) {
+                NavigationLink(value: MusicRoute.artist(artist)) {
                     LabeledContent(L10n.string("ui.common.artist"), value: artist.name)
                 }
-                .musicMatchedTransitionSource(for: MusicRoute.artist(artist.id))
+                .musicMatchedTransitionSource(for: MusicRoute.artist(artist))
             }
 
             if let album = song.album {
