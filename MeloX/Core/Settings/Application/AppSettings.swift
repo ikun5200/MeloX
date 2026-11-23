@@ -114,6 +114,7 @@ final class AppSettings {
     private enum Key {
         static let hasCompletedOnboarding = "melox.hasCompletedOnboarding"
         static let cookie = "musicCookie"
+        static let qqCredential = "qqMusicCredential"
         static let quality = "musicQuality"
         static let cellularQuality = "cellularMusicQuality"
         static let playerVolumeControlMode = "playerVolumeControlMode"
@@ -280,6 +281,28 @@ final class AppSettings {
 
     var cookie: String {
         didSet { defaults.set(cookie, forKey: Key.cookie) }
+    }
+
+    private(set) var qqCredential: QQCredential = .empty
+
+    var isQQLoggedIn: Bool {
+        qqCredential.isValid
+    }
+
+    var qqAccountScopeID: String {
+        qqCredential.accountScopeID
+    }
+
+    func saveQQCredential(_ credential: QQCredential) {
+        qqCredential = credential
+        if let data = try? JSONEncoder().encode(credential) {
+            defaults.set(data, forKey: Key.qqCredential)
+        }
+    }
+
+    func clearQQCredential() {
+        qqCredential = .empty
+        defaults.removeObject(forKey: Key.qqCredential)
     }
 
     var automaticallyCachesPageContent: Bool {
@@ -1333,6 +1356,13 @@ final class AppSettings {
         searchSuggestionsEnabled = defaults.object(forKey: Key.searchSuggestionsEnabled) as? Bool ?? true
         L10n.activate(storedAppLanguage)
         cookie = defaults.string(forKey: Key.cookie) ?? ""
+        if let data = defaults.data(forKey: Key.qqCredential),
+           let stored = try? JSONDecoder().decode(
+            QQCredential.self,
+            from: data
+           ) {
+            qqCredential = stored
+        }
         quality = MusicQuality(rawValue: defaults.string(forKey: Key.quality) ?? "") ?? .high
         cellularQuality = MusicQuality(
             rawValue: defaults.string(forKey: Key.cellularQuality) ?? ""

@@ -63,7 +63,7 @@ final class NeteaseAPI {
     let client: NeteaseDirectClient
 
     @ObservationIgnored
-    let qq: QQMusicClient
+    private(set) var qq: QQMusicClient
 
     @ObservationIgnored
     let resolver: LXPlaybackResolver?
@@ -84,7 +84,12 @@ final class NeteaseAPI {
         self.resolver = resolver
         pageContentCache = PageContentCache(settings: settings)
         client = NeteaseDirectClient(settings: settings, session: session)
-        qq = QQMusicClient(session: session)
+        qq = QQMusicClient(
+            session: session,
+            credential: settings.qqCredential.isValid
+                ? settings.qqCredential
+                : nil
+        )
         pathMonitor.pathUpdateHandler = { [weak self] path in
             let isCellular = path.usesInterfaceType(.cellular)
             Task { @MainActor [weak self] in
@@ -96,6 +101,20 @@ final class NeteaseAPI {
 
     deinit {
         pathMonitor.cancel()
+    }
+
+    func updateQQCredential(_ credential: QQCredential) {
+        qq = qq.replacingCredential(
+            credential.isValid ? credential : nil
+        )
+    }
+
+    var isUsingSourceResolver: Bool {
+        resolver != nil
+    }
+
+    var sourcePlaybackQualities: [MusicQuality] {
+        resolver?.supportedQualities ?? []
     }
 
     func recommendedPlaylists(limit: Int = 10) async throws -> [Playlist] {

@@ -2,6 +2,7 @@ import Foundation
 
 enum SettingsRoute: Hashable {
     case accountHome
+    case qqAccount
     case playback
     case playerAppearance
     case lyrics
@@ -118,6 +119,13 @@ enum SettingsCatalog {
                     subtitle: L10n.string("ui.settings.sources.subtitle"),
                     systemImage: "antenna.radiowaves.left.and.right",
                     keywords: L10n.keywords("ui.settings.sources.keywords")
+                ),
+                SettingsCatalogItem(
+                    route: .qqAccount,
+                    title: L10n.string("ui.settings.qq_account.title"),
+                    subtitle: L10n.string("ui.settings.qq_account.subtitle"),
+                    systemImage: "person.badge.key",
+                    keywords: L10n.keywords("ui.settings.qq_account.keywords")
                 ),
                 SettingsCatalogItem(
                     route: .storage,

@@ -26,6 +26,15 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
         self.qimei36 = qimei36
     }
 
+    func replacingCredential(_ credential: QQCredential?) -> QQMusicClient {
+        QQMusicClient(
+            session: urlSession,
+            credential: credential,
+            guid: guid,
+            qimei36: qimei36
+        )
+    }
+
     func search(
         query: String,
         kind: QQSearchKind,

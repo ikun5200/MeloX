@@ -145,6 +145,8 @@ struct SettingsView: View {
             ContentSettingsView()
         case .sources:
             LXSourceSettingsView()
+        case .qqAccount:
+            QQAccountSettingsView()
         case .storage:
             StorageManagementView()
         case .skylineLyrics:

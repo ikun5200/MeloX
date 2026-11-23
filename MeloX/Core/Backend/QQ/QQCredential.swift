@@ -15,13 +15,39 @@ nonisolated struct QQCredential: Codable, Equatable, Sendable {
     var encryptUIN: String = ""
     var loginType: Int = 0
     var expiredAt: Int = 0
+    var musicKeyCreateTime: Int = 0
+    var keyExpiresIn: Int = 0
     var nickName: String = ""
     var avatarURL: String = ""
+
+    enum CodingKeys: String, CodingKey {
+        case musicID = "musicid"
+        case musicKey = "musickey"
+        case refreshKey = "refresh_key"
+        case refreshToken = "refresh_token"
+        case openID = "openid"
+        case accessToken = "access_token"
+        case encryptUIN = "encryptUin"
+        case loginType = "loginType"
+        case expiredAt = "expired_at"
+        case musicKeyCreateTime = "musickeyCreateTime"
+        case keyExpiresIn = "keyExpiresIn"
+        case nickName = "nickName"
+        case avatarURL = "avatarURL"
+    }
 
     static let empty = QQCredential()
 
     var isValid: Bool {
         musicID > 0 && !musicKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var isExpired: Bool {
+        guard musicKeyCreateTime > 0, keyExpiresIn > 0 else {
+            return false
+        }
+        return Int(Date().timeIntervalSince1970)
+            >= musicKeyCreateTime + keyExpiresIn
     }
 
     /// 账号级缓存作用域。用于替代旧实现里的 `SHA256(cookie)`。
