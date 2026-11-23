@@ -132,7 +132,7 @@
 "ui.settings.equalizer.preset.jazz" = "爵士";
 "ui.settings.equalizer.preset.pop" = "流行";
 "ui.settings.equalizer.preset.rock" = "摇滚";
-"ui.settings.equalizer.preset.spoken_word" = "播客与有声书";
+"ui.settings.equalizer.preset.spoken_word" = "人声与有声书";
 "ui.settings.equalizer.preset.treble_boost" = "高音增强";
 "ui.settings.equalizer.preset.treble_reduce" = "高音减弱";
 "ui.settings.equalizer.preset.vocal" = "人声突出";
@@ -338,8 +338,8 @@
 "ui.settings.catalog.features.subtitle" = "启用或停用下载与最近播放";
 "ui.settings.catalog.features.keywords" = "开关|隐藏|下载|最近播放|播放记录";
 "ui.settings.catalog.content.title" = "发现内容";
-"ui.settings.catalog.content.subtitle" = "新碟地区、歌单信息与听歌识曲";
-"ui.settings.catalog.content.keywords" = "华语|欧美|韩国|日本|播放量|听歌识曲|麦克风|识别时长|持续识别";
+"ui.settings.catalog.content.subtitle" = "新碟地区与歌单信息";
+"ui.settings.catalog.content.keywords" = "华语|欧美|韩国|日本|播放量";
 "ui.settings.catalog.storage.title" = "存储管理";
 "ui.settings.catalog.storage.subtitle.downloads" = "空间统计、下载管理与缓存清理";
 "ui.settings.catalog.storage.subtitle" = "空间统计与缓存清理";
@@ -348,7 +348,7 @@
 "ui.settings.catalog.interface.section" = "界面与应用";
 "ui.settings.catalog.tab_layout.title" = "页面与标签栏";
 "ui.settings.catalog.tab_layout.subtitle" = "调整首页、标签栏与音乐库中的页面";
-"ui.settings.catalog.tab_layout.keywords" = "首页|TabView|标签栏|排序|推荐|播客|云盘|歌曲|歌单|历史";
+"ui.settings.catalog.tab_layout.keywords" = "首页|TabView|标签栏|排序|推荐|歌曲|歌单|历史";
 "ui.settings.catalog.download.keyword" = "下载";
 "ui.settings.catalog.general.title" = "通用";
 "ui.settings.catalog.general.subtitle" = "主题、启动页面、剪贴板链接与音乐库记忆";
@@ -393,7 +393,7 @@
 "ui.settings.account.subtitle" = "用户 ID %ld · 账号信息与同步";
 
 "ui.settings.content_features.section" = "可选功能";
-"ui.settings.content_features.footer" = "关闭后会隐藏相关入口并停止主动载入对应内容，不会删除收藏、下载、云盘歌曲或播放记录。";
+"ui.settings.content_features.footer" = "关闭后会隐藏相关入口并停止主动载入对应内容，不会删除收藏、下载或播放记录。";
 "ui.settings.developer.beatnet_panel" = "BeatNet 实时调试面板";
 "ui.settings.developer.entry" = "入口";
 "ui.settings.developer.entry.value" = "播放器“…”菜单";
@@ -607,7 +607,7 @@
 "ui.settings.automix.playback.footer" = "%@ 智能混音期间两首歌会沿同一条速度曲线逐渐交接，并在中段交换低频，避免底鼓互相覆盖。播放器中的混音进度直接取自两台播放器实际走过的媒体时间；暂停或缓冲时不会继续前进。“提前预载”只控制何时准备第二个播放器。";
 "ui.settings.automix.analysis_unavailable" = "分析不可用时";
 "ui.settings.automix.section.failure_strategy" = "失败策略";
-"ui.settings.content.title" = "发现与识曲";
+"ui.settings.content.title" = "发现内容";
 "ui.settings.content.section.discovery" = "发现内容";
 "ui.settings.content.album_region" = "新碟地区";
 "ui.settings.content.show_play_count" = "显示歌单播放量";
@@ -635,7 +635,7 @@
 "ui.settings.tab_layout.reset" = "恢复默认页面布局";
 "ui.settings.tab_layout.reset.confirmation" = "恢复默认页面布局？";
 "ui.settings.tab_layout.reset.action" = "恢复默认布局";
-"ui.settings.tab_layout.reset.message" = "推荐、音乐和播客会回到首页；云盘会放到底部标签栏，其他收藏与本地页面会回到音乐库。";
+"ui.settings.tab_layout.reset.message" = "推荐和音乐页面会回到首页；其他收藏与本地页面会回到音乐库。";
 "ui.settings.tab_layout.fixed_entry" = "固定入口";
 "ui.settings.tab_layout.system_fixed" = "系统固定";
 
@@ -962,7 +962,7 @@
 "ui.onboarding.account.connect_message" = "登录后可以同步个人音乐库并使用账号相关功能。登录并不是开始使用 MeloX 的必要条件。";
 "ui.onboarding.benefit.sync_library" = "同步收藏歌曲、歌单和播放历史";
 "ui.onboarding.benefit.personalized_content" = "访问每日推荐等账号专属内容";
-"ui.onboarding.benefit.local_cookie" = "登录 Cookie 仅保存在本机";
+"ui.onboarding.benefit.local_cookie" = "登录凭证仅保存在本机";
 "ui.settings.about.shareholders" = "股东";
 
 "ui.release_notes.title" = "更新日志";
@@ -1140,8 +1140,8 @@
 "ui.library.pages_separated.message" = "可在“页面与标签栏”设置中调整页面归属。";
 "ui.library.error.title" = "音乐库操作失败";
 "ui.account.login_required" = "需要登录";
-"ui.library.login_message.downloads" = "登录后可读取收藏歌曲、歌单、订阅播客、音乐云盘和播放记录；已下载歌曲无需登录。";
-"ui.library.login_message" = "登录后可读取收藏歌曲、歌单、订阅播客、音乐云盘和播放记录。";
+"ui.library.login_message.downloads" = "登录后可读取收藏歌曲、歌单与播放记录；已下载歌曲无需登录。";
+"ui.library.login_message" = "登录后可读取收藏歌曲、歌单与播放记录。";
 "ui.library.loading" = "正在读取音乐库";
 "ui.library.search.favorite_songs" = "在收藏歌曲中搜索";
 "ui.library.search.favorite_playlists" = "在收藏歌单中搜索";

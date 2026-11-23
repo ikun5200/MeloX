@@ -132,7 +132,7 @@
 "ui.settings.equalizer.preset.jazz" = "Jazz";
 "ui.settings.equalizer.preset.pop" = "Pop";
 "ui.settings.equalizer.preset.rock" = "Rock";
-"ui.settings.equalizer.preset.spoken_word" = "Podcasts & Spoken Word";
+"ui.settings.equalizer.preset.spoken_word" = "Spoken Word & Audiobooks";
 "ui.settings.equalizer.preset.treble_boost" = "Treble Booster";
 "ui.settings.equalizer.preset.treble_reduce" = "Treble Reducer";
 "ui.settings.equalizer.preset.vocal" = "Vocal Booster";
@@ -338,8 +338,8 @@
 "ui.settings.catalog.features.subtitle" = "Enable or disable downloads and Recently Played";
 "ui.settings.catalog.features.keywords" = "toggle|hide|downloads|recently played|playback history";
 "ui.settings.catalog.content.title" = "Discovery Content";
-"ui.settings.catalog.content.subtitle" = "New album region, playlist details, and music recognition";
-"ui.settings.catalog.content.keywords" = "Chinese|Western|Korea|Japan|play count|music recognition|microphone|recognition duration|continuous";
+"ui.settings.catalog.content.subtitle" = "New album region and playlist details";
+"ui.settings.catalog.content.keywords" = "Chinese|Western|Korea|Japan|play count";
 "ui.settings.catalog.storage.title" = "Storage Management";
 "ui.settings.catalog.storage.subtitle.downloads" = "Storage overview, download management, and cache cleanup";
 "ui.settings.catalog.storage.subtitle" = "Storage overview and cache cleanup";
@@ -348,7 +348,7 @@
 "ui.settings.catalog.interface.section" = "Interface & App";
 "ui.settings.catalog.tab_layout.title" = "Pages & Tab Bar";
 "ui.settings.catalog.tab_layout.subtitle" = "Arrange pages on Home, the tab bar, and in Library";
-"ui.settings.catalog.tab_layout.keywords" = "Home|TabView|tab bar|order|For You|podcasts|cloud|songs|playlists|history";
+"ui.settings.catalog.tab_layout.keywords" = "Home|TabView|tab bar|order|recommended|songs|playlists|history";
 "ui.settings.catalog.download.keyword" = "downloads";
 "ui.settings.catalog.general.title" = "General";
 "ui.settings.catalog.general.subtitle" = "Theme, launch page, clipboard links, and Library memory";
@@ -393,7 +393,7 @@
 "ui.settings.account.subtitle" = "User ID %ld · Account Info & Sync";
 
 "ui.settings.content_features.section" = "Optional Features";
-"ui.settings.content_features.footer" = "Turning a feature off hides its entry points and stops proactively loading its content. Favorites, downloads, cloud songs, and playback history are not deleted.";
+"ui.settings.content_features.footer" = "Disabling a module hides its entry points and stops loading its content. Favorites, downloads, and playback history are not deleted.";
 "ui.settings.developer.beatnet_panel" = "BeatNet Live Debug Panel";
 "ui.settings.developer.entry" = "Entry Point";
 "ui.settings.developer.entry.value" = "Player More (…) Menu";
@@ -607,7 +607,7 @@
 "ui.settings.automix.playback.footer" = "%@ During a smart mix, both songs gradually hand off along the same tempo curve and swap low frequencies in the middle to prevent kick-drum overlap. Mix progress reflects the media time actually advanced by both players, so it stops while paused or buffering. Preload Lead Time only controls when the second player is prepared.";
 "ui.settings.automix.analysis_unavailable" = "When Analysis Is Unavailable";
 "ui.settings.automix.section.failure_strategy" = "Fallback";
-"ui.settings.content.title" = "Discovery & Recognition";
+"ui.settings.content.title" = "Discovery";
 "ui.settings.content.section.discovery" = "Discover Content";
 "ui.settings.content.album_region" = "New Album Region";
 "ui.settings.content.show_play_count" = "Show Playlist Play Counts";
@@ -635,7 +635,7 @@
 "ui.settings.tab_layout.reset" = "Restore Default Page Layout";
 "ui.settings.tab_layout.reset.confirmation" = "Restore the default page layout?";
 "ui.settings.tab_layout.reset.action" = "Restore Default Layout";
-"ui.settings.tab_layout.reset.message" = "Recommended, Music, and Podcasts return to Home; Cloud Drive moves to the tab bar; other favorites and local pages return to Library.";
+"ui.settings.tab_layout.reset.message" = "Recommended and Music pages return to Home; other saved and local pages return to the Library.";
 "ui.settings.tab_layout.fixed_entry" = "Fixed Entry";
 "ui.settings.tab_layout.system_fixed" = "Fixed by System";
 
@@ -962,7 +962,7 @@
 "ui.onboarding.account.connect_message" = "Sign in to sync your personal music library and use account features. Signing in is not required to start using MeloX.";
 "ui.onboarding.benefit.sync_library" = "Sync favorite songs, playlists, and listening history";
 "ui.onboarding.benefit.personalized_content" = "Access Daily Recommendations and other personalized content";
-"ui.onboarding.benefit.local_cookie" = "Your sign-in cookie is stored only on this device";
+"ui.onboarding.benefit.local_cookie" = "Your sign-in credential is stored only on this device";
 "ui.settings.about.shareholders" = "Shareholders";
 
 "ui.release_notes.title" = "Release Notes";
@@ -1140,8 +1140,8 @@
 "ui.library.pages_separated.message" = "Change where pages appear in Pages & Tab Bar settings.";
 "ui.library.error.title" = "Library Operation Failed";
 "ui.account.login_required" = "Sign-In Required";
-"ui.library.login_message.downloads" = "Sign in to access favorite songs, playlists, subscribed podcasts, Cloud Drive, and listening history. Downloaded songs are available without signing in.";
-"ui.library.login_message" = "Sign in to access favorite songs, playlists, subscribed podcasts, Cloud Drive, and listening history.";
+"ui.library.login_message.downloads" = "Sign in to load favorite songs, playlists, and playback history; downloaded songs do not require signing in.";
+"ui.library.login_message" = "Sign in to load favorite songs, playlists, and playback history.";
 "ui.library.loading" = "Loading Library";
 "ui.library.search.favorite_songs" = "Search Favorite Songs";
 "ui.library.search.favorite_playlists" = "Search Favorite Playlists";
