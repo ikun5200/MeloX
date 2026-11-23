@@ -172,12 +172,8 @@ private struct NowPlayingQualityMenu: View {
 
     private var qualityBinding: Binding<MusicQuality> {
         Binding(
-            get: {
-                api.isCellularData
-                    ? settings.cellularQuality
-                    : settings.quality
-            },
-            set: { player.selectPlaybackQuality($0) }
+            get: { api.playbackQuality },
+            set: { player.selectSessionPlaybackQuality($0) }
         )
     }
 }

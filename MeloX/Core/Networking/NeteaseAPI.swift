@@ -71,8 +71,31 @@ final class NeteaseAPI {
     @ObservationIgnored
     let pageContentCache: PageContentCache
 
-    private var playbackQuality: MusicQuality {
-        isCellularData ? settings.cellularQuality : settings.quality
+    private var sessionPlaybackQuality: MusicQuality?
+    private var sessionCellularPlaybackQuality: MusicQuality?
+
+    var playbackQuality: MusicQuality {
+        if isCellularData {
+            return sessionCellularPlaybackQuality
+                ?? settings.cellularQuality
+        }
+        return sessionPlaybackQuality ?? settings.quality
+    }
+
+    func setSessionPlaybackQuality(
+        _ quality: MusicQuality,
+        forCellularData isCellular: Bool
+    ) {
+        if isCellular {
+            sessionCellularPlaybackQuality = quality
+        } else {
+            sessionPlaybackQuality = quality
+        }
+    }
+
+    func clearSessionPlaybackQuality() {
+        sessionPlaybackQuality = nil
+        sessionCellularPlaybackQuality = nil
     }
 
     init(

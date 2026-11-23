@@ -637,6 +637,7 @@ final class PlayerStore {
 
     func selectPlaybackQuality(_ quality: MusicQuality, forCellularData: Bool? = nil) {
         let targetsCellularData = forCellularData ?? api.isCellularData
+        api.clearSessionPlaybackQuality()
         let currentQuality = targetsCellularData
             ? settings.cellularQuality
             : settings.quality
@@ -652,6 +653,38 @@ final class PlayerStore {
             settings.quality = quality
         }
         guard targetsCellularData == api.isCellularData, let songID else { return }
+        seekRevision += 1
+        let qualityChangeRevision = seekRevision
+        Task { @MainActor [weak self] in
+            guard let self,
+                  self.currentSong?.id == songID else { return }
+            let startPosition =
+                self.seekRevision == qualityChangeRevision
+                ? resumePosition
+                : self.estimatedProgress()
+            await self.loadCurrentSong(
+                autoplay: shouldAutoplay,
+                startAt: startPosition
+            )
+        }
+    }
+
+    /// Quality changes made from the Now Playing screen are scoped to this
+    /// app session. The persistent defaults in Settings are untouched, so a
+    /// fresh launch returns to the Wi-Fi/cellular quality configured there.
+    func selectSessionPlaybackQuality(_ quality: MusicQuality) {
+        let targetsCellularData = api.isCellularData
+        guard api.playbackQuality != quality else { return }
+        let shouldAutoplay = isPlaying
+            || (isLoading && currentLoadShouldAutoplay)
+        let resumePosition = engine.currentPlaybackTime
+            ?? estimatedProgress()
+        let songID = currentSong?.id
+        api.setSessionPlaybackQuality(
+            quality,
+            forCellularData: targetsCellularData
+        )
+        guard let songID else { return }
         seekRevision += 1
         let qualityChangeRevision = seekRevision
         Task { @MainActor [weak self] in

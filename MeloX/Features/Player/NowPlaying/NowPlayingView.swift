@@ -541,6 +541,22 @@ struct NowPlayingView: View {
                         width: portraitArtworkFrame.width,
                         height: portraitArtworkFrame.height
                     )
+                    .contentShape(.rect)
+                    .onTapGesture {
+                        guard artworkReturnsToPlayer else { return }
+                        pageSelection.wrappedValue = .artwork
+                    }
+                    .allowsHitTesting(artworkReturnsToPlayer)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityAddTraits(
+                        artworkReturnsToPlayer ? .isButton : []
+                    )
+                    .accessibilityLabel(
+                        artworkReturnsToPlayer
+                            ? L10n.string("ui.player.show_artwork_page")
+                            : ""
+                    )
+                    .accessibilityHidden(!artworkReturnsToPlayer)
                     .position(
                         x:
                             portraitArtworkFrame.midX
@@ -556,24 +572,16 @@ struct NowPlayingView: View {
                                 .animation,
                         value: isPortraitArtworkExpanded
                     )
-                    .contentShape(.rect)
-                    .onTapGesture {
-                        guard artworkReturnsToPlayer else { return }
-                        pageSelection.wrappedValue = .artwork
-                    }
-                    .allowsHitTesting(artworkReturnsToPlayer)
-                    .accessibilityElement(
-                        children: artworkReturnsToPlayer ? .ignore : .contain
+                    .animation(
+                        accessibilityReduceMotion
+                            ? nil
+                            : .spring(
+                                response: 0.5,
+                                dampingFraction: 0.88,
+                                blendDuration: 0.08
+                            ),
+                        value: page
                     )
-                    .accessibilityAddTraits(
-                        artworkReturnsToPlayer ? .isButton : []
-                    )
-                    .accessibilityLabel(
-                        artworkReturnsToPlayer
-                            ? L10n.string("ui.player.show_artwork_page")
-                            : ""
-                    )
-                    .accessibilityHidden(!artworkReturnsToPlayer)
                 }
             }
             // Keep page-transition clipping vertically while allowing the

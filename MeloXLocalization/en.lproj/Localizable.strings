@@ -579,7 +579,7 @@
 "ui.settings.playback.wifi_quality" = "Wi-Fi Playback Quality";
 "ui.settings.playback.cellular_quality" = "Cellular Playback Quality";
 "ui.settings.playback.volume_control" = "Volume Control";
-"ui.settings.playback.quality.footer" = "Audio quality is limited by music rights and your account. Hi-Res, spatial audio, and master quality are used only when available and fall back automatically. %@";
+"ui.settings.playback.quality.footer" = "Audio quality is limited by music rights and your account. Hi-Res, spatial audio, and master quality are used only when available and fall back automatically. %@. Quality changes made on the Now Playing screen apply only until the app restarts; reopening the app restores these defaults.";
 "ui.settings.playback.section.audio_processing" = "Audio Processing";
 "ui.settings.playback.audio_processing.footer.downloads" = "Equalizer and AutoMix apply to both streaming and downloaded music.";
 "ui.settings.playback.audio_processing.footer" = "Equalizer and AutoMix apply to music playback.";
