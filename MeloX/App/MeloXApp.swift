@@ -7,6 +7,7 @@ struct MeloXApp: App {
 
     @State private var settings: AppSettings
     @State private var api: NeteaseAPI
+    @State private var sourceStore: LXSourceStore
     @State private var library: LibraryStore
     @State private var cloud: CloudMusicStore
     @State private var downloads: DownloadStore
@@ -38,7 +39,12 @@ struct MeloXApp: App {
             hadCompletedOnboarding: settings.hasCompletedOnboarding,
             currentReleaseNotes: AppReleaseNotesLoader.load()
         )
-        let api = NeteaseAPI(settings: settings)
+        let sourceStore = LXSourceStore()
+        let resolver = LXPlaybackResolver(store: sourceStore)
+        let api = NeteaseAPI(
+            settings: settings,
+            resolver: resolver
+        )
         let library = LibraryStore(api: api, settings: settings)
         let cloud = CloudMusicStore(api: api, settings: settings)
         let downloads = DownloadStore(api: api, settings: settings)
@@ -70,6 +76,7 @@ struct MeloXApp: App {
         )
         _settings = State(initialValue: settings)
         _api = State(initialValue: api)
+        _sourceStore = State(initialValue: sourceStore)
         _library = State(initialValue: library)
         _cloud = State(initialValue: cloud)
         _downloads = State(initialValue: downloads)
@@ -90,6 +97,7 @@ struct MeloXApp: App {
             ContentView(initialTab: settings.launchTab)
                 .environment(settings)
                 .environment(api)
+                .environment(sourceStore)
                 .environment(library)
                 .environment(cloud)
                 .environment(downloads)

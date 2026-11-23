@@ -66,14 +66,22 @@ final class NeteaseAPI {
     let qq: QQMusicClient
 
     @ObservationIgnored
+    let resolver: LXPlaybackResolver?
+
+    @ObservationIgnored
     let pageContentCache: PageContentCache
 
     private var playbackQuality: MusicQuality {
         isCellularData ? settings.cellularQuality : settings.quality
     }
 
-    init(settings: AppSettings, session: URLSession = .shared) {
+    init(
+        settings: AppSettings,
+        session: URLSession = .shared,
+        resolver: LXPlaybackResolver? = nil
+    ) {
         self.settings = settings
+        self.resolver = resolver
         pageContentCache = PageContentCache(settings: settings)
         client = NeteaseDirectClient(settings: settings, session: session)
         qq = QQMusicClient(session: session)
@@ -369,7 +377,10 @@ final class NeteaseAPI {
     }
 
     func playbackSource(id: Int) async throws -> PlaybackSource {
-        try await playbackSource(
+        if resolver != nil {
+            throw LXPlaybackError.missingSongMID
+        }
+        return try await playbackSource(
             id: id,
             quality: playbackQuality,
             availability: .unknown
@@ -377,7 +388,13 @@ final class NeteaseAPI {
     }
 
     func playbackSource(for song: Song) async throws -> PlaybackSource {
-        try await playbackSource(
+        if let resolver {
+            return try await resolver.resolve(
+                song: song,
+                quality: playbackQuality
+            )
+        }
+        return try await playbackSource(
             id: song.id,
             quality: playbackQuality,
             availability: song.audioAvailability
@@ -457,6 +474,12 @@ final class NeteaseAPI {
         for song: Song,
         quality: MusicQuality
     ) async throws -> PlaybackSource {
+        if let resolver {
+            return try await resolver.resolve(
+                song: song,
+                quality: quality
+            )
+        }
         do {
             for candidate in quality.playbackCandidates(
                 for: song.audioAvailability

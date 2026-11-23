@@ -82,6 +82,7 @@ final class PlayerStore {
     }
 
     private var playbackQueue = PlaybackQueue()
+    private var consecutiveSourceFailures = 0
 
     var queue: [Song] { playbackQueue.songs }
     var currentIndex: Int { playbackQueue.currentIndex }
@@ -1174,6 +1175,7 @@ final class PlayerStore {
             isResolvingSource = false
             currentPlaybackSource = source
             effectivePlaybackQuality = source.quality
+            consecutiveSourceFailures = 0
             let shouldAutoplay = currentLoadShouldAutoplay
             let resolvedStartPosition = estimatedProgress()
             await engine.load(
@@ -1188,9 +1190,22 @@ final class PlayerStore {
             isResolvingSource = false
             isLoading = false
             isPlaying = false
+            consecutiveSourceFailures += 1
             playbackIssue = PlaybackIssue(song: song, error: error)
             updateNowPlayingState()
             persistSnapshot()
+
+            // 洛雪源解析失败时提示并自动跳下一首；连续失败到队列长度后停止，
+            // 避免在全部歌曲都不可解析时无限循环。
+            guard consecutiveSourceFailures < max(queue.count, 1) else {
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(900))
+            guard generation == loadGeneration,
+                  currentSong?.id == song.id else {
+                return
+            }
+            await moveToNext(recordingCurrentPlayback: false)
         }
     }
 
@@ -1220,6 +1235,9 @@ final class PlayerStore {
                 if let cachedDetailedSong {
                     return try await api.playbackSource(for: cachedDetailedSong)
                 }
+                if !song.mid.isEmpty {
+                    return try await api.playbackSource(for: song)
+                }
                 return try await api.playbackSource(id: song.id)
             } catch is CancellationError {
                 throw CancellationError()
@@ -1234,6 +1252,9 @@ final class PlayerStore {
     }
 
     private static func isRetryablePlaybackSourceError(_ error: Error) -> Bool {
+        if error is LXPlaybackError {
+            return false
+        }
         if let apiError = error as? APIError {
             switch apiError {
             case .noPlayableSource, .emptyResponse, .invalidResponse:

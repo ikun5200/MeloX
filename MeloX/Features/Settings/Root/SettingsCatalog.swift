@@ -10,6 +10,7 @@ enum SettingsRoute: Hashable {
     case tabLayout
     case contentFeatures
     case content
+    case sources
     case storage
     case skylineLyrics
     case floatingLyrics
@@ -110,6 +111,13 @@ enum SettingsCatalog {
                     subtitle: L10n.string("ui.settings.catalog.content.subtitle"),
                     systemImage: "rectangle.stack",
                     keywords: L10n.keywords("ui.settings.catalog.content.keywords")
+                ),
+                SettingsCatalogItem(
+                    route: .sources,
+                    title: L10n.string("ui.settings.sources.title"),
+                    subtitle: L10n.string("ui.settings.sources.subtitle"),
+                    systemImage: "antenna.radiowaves.left.and.right",
+                    keywords: L10n.keywords("ui.settings.sources.keywords")
                 ),
                 SettingsCatalogItem(
                     route: .storage,

@@ -2168,3 +2168,27 @@
 "ui.library.search.loading" = "正在搜索全部收藏…";
 "ui.library.search.empty.title" = "没有找到收藏歌曲";
 "ui.library.search.empty.description" = "试试其他歌名、歌手或专辑名。";
+
+"ui.settings.sources.title" = "音源";
+"ui.settings.sources.subtitle" = "管理洛雪 QQ 音乐源与优先级";
+"ui.settings.sources.keywords" = "音源|洛雪|QQ音乐|解析|优先级|LX";
+"ui.sources.section.add" = "添加音源";
+"ui.sources.section.installed" = "已添加的音源";
+"ui.sources.url.placeholder" = "粘贴洛雪音源脚本 URL";
+"ui.sources.action.add_url" = "添加 URL";
+"ui.sources.action.add_list" = "导入源列表";
+"ui.sources.action.add_file" = "导入 .js 文件";
+"ui.sources.action.refresh" = "重新检查";
+"ui.sources.action.delete" = "删除";
+"ui.sources.action.move_up" = "上移";
+"ui.sources.action.move_down" = "下移";
+"ui.sources.empty" = "还没有音源。先添加一个支持 QQ 音乐的洛雪源。";
+"ui.sources.qualities" = "支持音质：%@";
+"ui.sources.version" = "版本 %@";
+"ui.sources.enabled" = "启用";
+"ui.sources.disabled" = "已停用";
+"ui.sources.working" = "正在处理音源…";
+"ui.sources.security" = "音源脚本会在本机 JavaScriptCore 中执行，并可通过 lx.request 访问网络。仅添加你信任的源；源地址中的 key 会明文保存在本机。";
+"ui.sources.error" = "音源操作失败";
+"ui.sources.no_qq" = "该源没有 QQ 音乐能力";
+"ui.sources.local" = "本地文件";

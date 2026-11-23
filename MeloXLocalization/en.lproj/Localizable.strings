@@ -2168,3 +2168,27 @@
 "ui.library.search.loading" = "Searching all favorites…";
 "ui.library.search.empty.title" = "No favorite songs found";
 "ui.library.search.empty.description" = "Try another song, artist, or album name.";
+
+"ui.settings.sources.title" = "Music Sources";
+"ui.settings.sources.subtitle" = "Manage Luoxue QQ Music sources and priority";
+"ui.settings.sources.keywords" = "source|luoxue|QQ Music|resolver|priority|LX";
+"ui.sources.section.add" = "Add Source";
+"ui.sources.section.installed" = "Installed Sources";
+"ui.sources.url.placeholder" = "Paste a Luoxue source script URL";
+"ui.sources.action.add_url" = "Add URL";
+"ui.sources.action.add_list" = "Import Source List";
+"ui.sources.action.add_file" = "Import .js File";
+"ui.sources.action.refresh" = "Recheck";
+"ui.sources.action.delete" = "Delete";
+"ui.sources.action.move_up" = "Move Up";
+"ui.sources.action.move_down" = "Move Down";
+"ui.sources.empty" = "No sources yet. Add a Luoxue source that supports QQ Music.";
+"ui.sources.qualities" = "Qualities: %@";
+"ui.sources.version" = "Version %@";
+"ui.sources.enabled" = "Enabled";
+"ui.sources.disabled" = "Disabled";
+"ui.sources.working" = "Working on sources…";
+"ui.sources.security" = "Source scripts run in the on-device JavaScriptCore and can access the network through lx.request. Only add sources you trust; keys in source URLs are stored in plain text on this device.";
+"ui.sources.error" = "Source operation failed";
+"ui.sources.no_qq" = "This source has no QQ Music capability";
+"ui.sources.local" = "Local file";

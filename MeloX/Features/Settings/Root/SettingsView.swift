@@ -143,6 +143,8 @@ struct SettingsView: View {
             ContentFeatureSettingsView()
         case .content:
             ContentSettingsView()
+        case .sources:
+            LXSourceSettingsView()
         case .storage:
             StorageManagementView()
         case .skylineLyrics:
