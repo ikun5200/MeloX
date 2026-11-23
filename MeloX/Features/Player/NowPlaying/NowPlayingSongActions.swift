@@ -5,6 +5,7 @@ struct NowPlayingSongActions: View {
     @Environment(AppSettings.self) private var settings
     @Environment(LibraryStore.self) private var library
     @Environment(PlayerStore.self) private var player
+    @Environment(NeteaseAPI.self) private var api
 
     let song: Song
     var showsFavoriteButton = true
@@ -59,9 +60,10 @@ struct NowPlayingSongActions: View {
     }
     private var songMenu: some View {
         Menu {
-            lyricsSourceMenu
-
-            Divider()
+            if !api.isUsingSourceResolver {
+                lyricsSourceMenu
+                Divider()
+            }
             Button {
                 presentedSheet = .sleepTimer
             } label: {

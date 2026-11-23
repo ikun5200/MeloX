@@ -18,7 +18,7 @@ struct PlaybackSnapshot: Codable {
 @MainActor
 final class PlaybackPersistence {
     private enum Key {
-        static let snapshot = "player.playbackSnapshot"
+        static let snapshot = "player.playbackSnapshot.v2"
     }
 
     private let defaults: UserDefaults

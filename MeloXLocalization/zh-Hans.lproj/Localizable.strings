@@ -162,9 +162,9 @@
 "ui.common.supported" = "支持";
 "ui.common.unsupported" = "不支持";
 
-"ui.service.netease" = "网易云音乐";
-"ui.metadata.netease_host" = "网易云主播";
-"ui.metadata.netease_user" = "网易云用户";
+"ui.service.netease" = "QQ 音乐";
+"ui.metadata.netease_host" = "QQ 音乐主播";
+"ui.metadata.netease_user" = "QQ 音乐用户";
 "ui.metadata.unknown_album" = "未知专辑";
 "ui.metadata.unknown_artist" = "未知艺术家";
 "ui.metadata.unknown_playlist" = "未知歌单";
@@ -193,8 +193,8 @@
 "ui.error.api.empty_response" = "音乐服务返回了空响应（%ld）。";
 "ui.error.api.server" = "请求失败（%ld）：%@";
 "ui.error.api.no_playable_source" = "当前歌曲可能因版权或地区限制，没有可用的播放地址。";
-"ui.error.api.login_required" = "请先登录网易云音乐。";
-"ui.error.api.operation_incomplete" = "网易云音乐未完成操作。";
+"ui.error.api.login_required" = "请先登录 QQ 音乐。";
+"ui.error.api.operation_incomplete" = "QQ 音乐未完成操作。";
 "ui.error.api.decode_with_hex" = "数据解析失败（%ld 字节，%@）：%@";
 "ui.error.api.decode" = "数据解析失败（%ld 字节）：%@；%@";
 "ui.error.update.no_release" = "当前仓库还没有发布版本。";
@@ -380,15 +380,15 @@
 "ui.settings.general.library.default.footer" = "每次启动 MeloX 后首次打开音乐库时，会显示所选页面。";
 
 "ui.settings.account.cookie.footer" = "登录 Cookie 仅保存在本机，用于同步收藏、云盘和账号内容。";
-"ui.settings.account.logout.confirmation" = "退出当前网易云账号？";
+"ui.settings.account.logout.confirmation" = "退出当前 QQ 音乐账号？";
 "ui.settings.account.logout" = "退出登录";
-"ui.settings.account.logout.message.downloads" = "本机保存的网易云登录 Cookie 和已加载的账号数据将被清除，已下载歌曲不会被删除。";
-"ui.settings.account.logout.message" = "本机保存的网易云登录 Cookie 和已加载的账号数据将被清除。";
+"ui.settings.account.logout.message.downloads" = "本机保存的 QQ 音乐登录信息和已加载的账号数据将被清除，已下载歌曲不会被删除。";
+"ui.settings.account.logout.message" = "本机保存的 QQ 音乐登录信息和已加载的账号数据将被清除。";
 "ui.settings.account.open.hint" = "打开账号信息与个人主页";
-"ui.settings.account.netease_account" = "网易云音乐账号";
+"ui.settings.account.netease_account" = "QQ 音乐账号";
 "ui.settings.account.loading" = "正在读取账号信息";
-"ui.settings.account.login" = "登录网易云音乐";
-"ui.settings.account.login.subtitle" = "同步收藏、云盘与播放记录";
+"ui.settings.account.login" = "登录 QQ 音乐";
+"ui.settings.account.login.subtitle" = "同步收藏与歌单";
 "ui.settings.account.subtitle.level" = "Lv.%ld · 用户 ID %ld";
 "ui.settings.account.subtitle" = "用户 ID %ld · 账号信息与同步";
 
@@ -499,7 +499,7 @@
 "ui.settings.live_activity.expanded.section" = "展开与锁定屏幕";
 "ui.settings.live_activity.title" = "实时活动歌词";
 
-"ui.about.tagline" = "第三方网易云音乐播放器";
+"ui.about.tagline" = "第三方 QQ 音乐播放器";
 "ui.about.app_info.section" = "应用信息";
 "ui.about.version" = "版本";
 "ui.about.build" = "构建版本";
@@ -510,7 +510,7 @@
 "ui.about.updates.section" = "更新";
 "ui.about.updates.footer" = "自动检查只会在发现新版本时提示，检查失败不会打断应用启动。";
 "ui.about.melox.section" = "关于 MeloX";
-"ui.about.description" = "MeloX 使用原生 SwiftUI 构建，专注于提供简洁、流畅的网易云音乐播放与歌词体验。";
+"ui.about.description" = "MeloX 使用原生 SwiftUI 构建，专注于提供简洁、流畅的 QQ 音乐播放与歌词体验。";
 "ui.about.shareholders.section" = "股东";
 "ui.about.community.section" = "项目与社区";
 "ui.about.website" = "MeloX 官网";
@@ -520,7 +520,7 @@
 "ui.about.open_source.section" = "开源与许可";
 "ui.about.open_source.footer" = "查看 MeloX、参考项目、音频指纹运行时、内置资源和 PV Tool 的许可与归属说明。";
 "ui.about.disclaimer.section" = "声明";
-"ui.about.disclaimer" = "MeloX 是非官方第三方客户端，与网易云音乐及其关联公司不存在隶属或授权关系。";
+"ui.about.disclaimer" = "MeloX 是非官方第三方客户端，与 QQ 音乐及其关联公司不存在隶属或授权关系。";
 "ui.about.open_release_page" = "打开发布页";
 "ui.about.update_available.title" = "发现新版本";
 "ui.about.update_available.message" = "当前版本 %@，最新版本 %@。可以前往发布页查看更新内容。";
@@ -949,8 +949,8 @@
 "ui.clipboard.listen_together_prompt" = "是否查看剪贴板里的一起听邀请？加入前仍可核对邀请链接。";
 "ui.clipboard.open_song" = "打开歌曲";
 "ui.clipboard.view_invitation" = "查看邀请";
-"ui.onboarding.welcome.subtitle" = "用原生方式发现、播放和收藏网易云音乐。";
-"ui.legal.unofficial_disclaimer" = "MeloX 是非官方第三方客户端，与网易云音乐及其关联公司不存在隶属、合作或授权关系。";
+"ui.onboarding.welcome.subtitle" = "用原生方式发现、播放和收藏 QQ 音乐。";
+"ui.legal.unofficial_disclaimer" = "MeloX 是非官方第三方客户端，与 QQ 音乐及其关联公司不存在隶属、合作或授权关系。";
 "ui.legal.projects_licenses.title" = "项目与许可";
 "ui.onboarding.account.logged_in_message" = "你的收藏歌曲、歌单和播放历史会显示在音乐库中。";
 "ui.onboarding.start" = "开始使用 MeloX";

@@ -58,6 +58,9 @@ jobs:
             exit 1
           fi
 
+      - name: Run backend checks / 运行后端检查
+        run: python3 -I Tools/Tests/test_qq_backend.py
+
       - name: Build unsigned IPA / 构建未签名 IPA
         env:
           RELEASE_NOTES_CURRENT_REF: ${{ github.sha }}

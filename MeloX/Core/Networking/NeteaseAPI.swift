@@ -950,7 +950,7 @@ final class NeteaseAPI {
         if isUsingSourceResolver {
             let credential = settings.qqCredential
             guard credential.isValid else { throw APIError.notLoggedIn }
-            let created = try await qq.createdPlaylists()
+            let created = (try? await qq.createdPlaylists()) ?? []
             let saved = (try? await qq.favoritePlaylists(limit: limit)) ?? []
             let createdPlaylists = created
                 .filter { $0.id > 0 && $0.dirid != 201 }

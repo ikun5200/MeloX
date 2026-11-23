@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LyricsContentSettingsView: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(NeteaseAPI.self) private var api
 
     private var usesWordByWordPresentation: Bool {
         settings.lyricsWordByWord || settings.lyricsPseudoWordByWord
@@ -120,24 +121,31 @@ struct LyricsContentSettingsView: View {
             }
 
             Section {
-                Picker(
-                    "ui.settings.lyrics.content.default_source",
-                    selection: $settings.lyricsSourcePreference
-                ) {
-                    ForEach(LyricSourcePreference.allCases) { preference in
-                        Text(preference.title).tag(preference)
+                if api.isUsingSourceResolver {
+                    LabeledContent(
+                        "ui.settings.lyrics.content.default_source",
+                        value: L10n.string("ui.lyrics.source.qq_music")
+                    )
+                } else {
+                    Picker(
+                        "ui.settings.lyrics.content.default_source",
+                        selection: $settings.lyricsSourcePreference
+                    ) {
+                        ForEach(LyricSourcePreference.allCases) { preference in
+                            Text(preference.title).tag(preference)
+                        }
                     }
+
+                    Toggle(
+                        "ui.settings.lyrics.content.amll_source",
+                        isOn: $settings.lyricsAMLLSourceEnabled
+                    )
+
+                    Toggle(
+                        "ui.settings.lyrics.content.qq_source",
+                        isOn: $settings.lyricsQQMusicSourceEnabled
+                    )
                 }
-
-                Toggle(
-                    "ui.settings.lyrics.content.amll_source",
-                    isOn: $settings.lyricsAMLLSourceEnabled
-                )
-
-                Toggle(
-                    "ui.settings.lyrics.content.qq_source",
-                    isOn: $settings.lyricsQQMusicSourceEnabled
-                )
             } header: {
                 Text("ui.settings.lyrics.content.section.source")
             } footer: {

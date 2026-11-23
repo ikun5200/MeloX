@@ -493,7 +493,7 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
     func songDetails(ids: [Int]) async throws -> [QQSearchSong] {
         guard !ids.isEmpty else { return [] }
         var songs: [QQSearchSong] = []
-        let batchSize = 20
+        let batchSize = 10
         for start in stride(from: 0, to: ids.count, by: batchSize) {
             let chunk = Array(
                 ids[start..<min(start + batchSize, ids.count)]

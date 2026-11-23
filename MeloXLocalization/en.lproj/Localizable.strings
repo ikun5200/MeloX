@@ -162,7 +162,7 @@
 "ui.common.supported" = "Supported";
 "ui.common.unsupported" = "Unsupported";
 
-"ui.service.netease" = "NetEase Cloud Music";
+"ui.service.netease" = "QQ Music";
 "ui.metadata.netease_host" = "NetEase Host";
 "ui.metadata.netease_user" = "NetEase User";
 "ui.metadata.unknown_album" = "Unknown Album";
@@ -193,7 +193,7 @@
 "ui.error.api.empty_response" = "The music service returned an empty response (%ld).";
 "ui.error.api.server" = "Request failed (%ld): %@";
 "ui.error.api.no_playable_source" = "This song may be unavailable due to copyright or regional restrictions.";
-"ui.error.api.login_required" = "Sign in to NetEase Cloud Music first.";
+"ui.error.api.login_required" = "Sign in to QQ Music first.";
 "ui.error.api.operation_incomplete" = "NetEase Cloud Music did not complete the operation.";
 "ui.error.api.decode_with_hex" = "Could not decode %ld bytes (%@): %@";
 "ui.error.api.decode" = "Could not decode %ld bytes (%@): %@";
@@ -380,12 +380,12 @@
 "ui.settings.general.library.default.footer" = "The selected page appears the first time you open Library after each launch.";
 
 "ui.settings.account.cookie.footer" = "Your sign-in cookie is stored only on this device and is used to sync favorites, Cloud Music, and account content.";
-"ui.settings.account.logout.confirmation" = "Sign Out of This NetEase Account?";
+"ui.settings.account.logout.confirmation" = "Sign Out of This QQ Music Account?";
 "ui.settings.account.logout" = "Sign Out";
 "ui.settings.account.logout.message.downloads" = "The saved NetEase sign-in cookie and loaded account data will be removed from this device. Downloaded songs will not be deleted.";
 "ui.settings.account.logout.message" = "The saved NetEase sign-in cookie and loaded account data will be removed from this device.";
 "ui.settings.account.open.hint" = "Opens account information and your profile";
-"ui.settings.account.netease_account" = "NetEase Cloud Music Account";
+"ui.settings.account.netease_account" = "QQ Music Account";
 "ui.settings.account.loading" = "Loading Account Information";
 "ui.settings.account.login" = "Sign In to NetEase Cloud Music";
 "ui.settings.account.login.subtitle" = "Sync favorites, Cloud Music, and playback history";
@@ -499,7 +499,7 @@
 "ui.settings.live_activity.expanded.section" = "Expanded & Lock Screen";
 "ui.settings.live_activity.title" = "Live Activity Lyrics";
 
-"ui.about.tagline" = "A Third-Party NetEase Cloud Music Player";
+"ui.about.tagline" = "A Third-Party QQ Music Player";
 "ui.about.app_info.section" = "App Information";
 "ui.about.version" = "Version";
 "ui.about.build" = "Build";
@@ -510,7 +510,7 @@
 "ui.about.updates.section" = "Updates";
 "ui.about.updates.footer" = "Automatic checks only notify you when a new version is available. A failed check never interrupts app launch.";
 "ui.about.melox.section" = "About MeloX";
-"ui.about.description" = "MeloX is built with native SwiftUI and focuses on a clean, fluid NetEase Cloud Music playback and lyrics experience.";
+"ui.about.description" = "MeloX is built with native SwiftUI and focuses on a clean, fluid QQ Music playback and lyrics experience.";
 "ui.about.shareholders.section" = "Shareholders";
 "ui.about.community.section" = "Project & Community";
 "ui.about.website" = "MeloX Website";
@@ -520,7 +520,7 @@
 "ui.about.open_source.section" = "Open Source & Licenses";
 "ui.about.open_source.footer" = "View licenses and attribution for MeloX, reference projects, the audio fingerprint runtime, bundled resources, and PV Tool.";
 "ui.about.disclaimer.section" = "Disclaimer";
-"ui.about.disclaimer" = "MeloX is an unofficial third-party client and is not affiliated with or authorized by NetEase Cloud Music or its related companies.";
+"ui.about.disclaimer" = "MeloX is an unofficial third-party client and is not affiliated with or authorized by QQ Music or its related companies.";
 "ui.about.open_release_page" = "Open Release Page";
 "ui.about.update_available.title" = "New Version Available";
 "ui.about.update_available.message" = "Current version: %@. Latest version: %@. Open the release page to see what's new.";
@@ -949,8 +949,8 @@
 "ui.clipboard.listen_together_prompt" = "View the Listen Together invitation from the clipboard? You can review the invitation link before joining.";
 "ui.clipboard.open_song" = "Open Song";
 "ui.clipboard.view_invitation" = "View Invitation";
-"ui.onboarding.welcome.subtitle" = "Discover, play, and collect music from NetEase Cloud Music in a native app.";
-"ui.legal.unofficial_disclaimer" = "MeloX is an unofficial third-party client and is not affiliated with, partnered with, or authorized by NetEase Cloud Music or its affiliates.";
+"ui.onboarding.welcome.subtitle" = "Discover, play, and collect music from QQ Music in a native app.";
+"ui.legal.unofficial_disclaimer" = "MeloX is an unofficial third-party client and is not affiliated with, partnered with, or authorized by QQ Music or its affiliates.";
 "ui.legal.projects_licenses.title" = "Projects & Licenses";
 "ui.onboarding.account.logged_in_message" = "Your favorite songs, playlists, and listening history appear in Library.";
 "ui.onboarding.start" = "Start Using MeloX";
