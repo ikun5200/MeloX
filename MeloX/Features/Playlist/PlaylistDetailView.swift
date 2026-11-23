@@ -532,10 +532,18 @@ struct PlaylistDetailView: View {
         loadMoreTracksError = nil
         do {
             let requestedTrackLimit = max(trackPageSize, loadedTrackOffset)
-            let loadedPlaylist = try await api.playlist(
-                id: id,
-                trackLimit: requestedTrackLimit
-            )
+            let loadedPlaylist: Playlist
+            if prefersToplistLayout, api.isUsingSourceResolver {
+                loadedPlaylist = try await api.toplistDetail(
+                    id: id,
+                    trackLimit: requestedTrackLimit
+                )
+            } else {
+                loadedPlaylist = try await api.playlist(
+                    id: id,
+                    trackLimit: requestedTrackLimit
+                )
+            }
             guard loadedPlaylist.trackCount == 0 || !loadedPlaylist.tracks.isEmpty else {
                 throw APIError.invalidResponse
             }

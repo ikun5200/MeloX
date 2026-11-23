@@ -38,15 +38,21 @@ final class LyricsService {
         for song: LyricsSongMetadata,
         onUpdate: @MainActor (ResolvedLyrics) -> Void
     ) async throws -> ResolvedLyrics {
-        let preference = settings.lyricsSourcePreference
-        let usesAMLL = preference.usesSource(
-            .amll,
-            enabledInAuto: settings.lyricsAMLLSourceEnabled
-        )
-        let usesQQMusic = preference.usesSource(
-            .qqMusic,
-            enabledInAuto: settings.lyricsQQMusicSourceEnabled
-        )
+        let storedPreference = settings.lyricsSourcePreference
+        let preference = api.isUsingSourceResolver
+            ? .qqMusic
+            : storedPreference
+        let usesNetease = !api.isUsingSourceResolver
+        let usesAMLL = !api.isUsingSourceResolver
+            && storedPreference.usesSource(
+                .amll,
+                enabledInAuto: settings.lyricsAMLLSourceEnabled
+            )
+        let usesQQMusic = api.isUsingSourceResolver
+            || storedPreference.usesSource(
+                .qqMusic,
+                enabledInAuto: settings.lyricsQQMusicSourceEnabled
+            )
         let cacheKey = CacheKey(
             song: song,
             preference: preference,
@@ -66,7 +72,8 @@ final class LyricsService {
         if preference == .automatic {
             // Load NetEase first so lyrics appear immediately instead of
             // waiting for the slower third-party lookups.
-            if let payload = try? await api.neteaseLyrics(id: song.id) {
+            if usesNetease,
+               let payload = try? await api.neteaseLyrics(id: song.id) {
                 sources.netease = payload
                 publish(
                     LyricSourceMerger.resolve(sources, preference: .netease),
@@ -112,11 +119,13 @@ final class LyricsService {
             )
         } else {
             await withTaskGroup(of: FetchEvent?.self) { group in
-                group.addTask {
-                    guard let payload = try? await api.neteaseLyrics(id: song.id) else {
-                        return nil
+                if usesNetease {
+                    group.addTask {
+                        guard let payload = try? await api.neteaseLyrics(id: song.id) else {
+                            return nil
+                        }
+                        return .netease(payload)
                     }
-                    return .netease(payload)
                 }
                 if usesAMLL {
                     group.addTask {

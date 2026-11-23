@@ -272,6 +272,17 @@ nonisolated enum QQMusicSearchParser {
         return Int(hash & 0x7FFF_FFFF)
     }
 
+    /// 评论 ID 是带 `!` 与 `*` 的字符串，用 63 位稳定哈希映射到 Int64。
+    static func stableID64(_ value: String) -> Int64 {
+        guard !value.isEmpty else { return 0 }
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        for byte in value.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 1_099_511_628_211
+        }
+        return Int64(hash & 0x7FFF_FFFF_FFFF_FFFF)
+    }
+
     private static func dictionary(_ value: Any?) -> [String: Any]? {
         value as? [String: Any]
     }

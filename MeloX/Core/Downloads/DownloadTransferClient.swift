@@ -40,9 +40,14 @@ final class DownloadTransferClient: NSObject, @preconcurrency URLSessionDownload
 
     func download(
         from url: URL,
+        headers: [String: String] = [:],
         onProgress: @escaping ProgressHandler
     ) async throws -> DownloadTransferResult {
-        let task = session.downloadTask(with: url)
+        var request = URLRequest(url: url)
+        for (key, value) in headers {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+        let task = session.downloadTask(with: request)
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 transfers[task.taskIdentifier] = Transfer(

@@ -74,7 +74,10 @@ final class AudioPlaybackDeck: NSObject, @preconcurrency AudioPlayerDelegate {
         initialSeek = max(startAt, 0)
         isSeeking = true
         transition(to: .loading)
-        let format = await AudioPlaybackFormat.load(from: source.url)
+        let format = await AudioPlaybackFormat.load(
+            from: source.url,
+            headers: source.headers
+        )
         guard itemID == id, !Task.isCancelled else { return false }
         let player = AudioStreaming.AudioPlayer(
             configuration: AudioPlayerConfiguration(
@@ -94,7 +97,7 @@ final class AudioPlaybackDeck: NSObject, @preconcurrency AudioPlayerDelegate {
         #endif
         return await withCheckedContinuation { continuation in
             loadContinuation = continuation
-            player.play(url: source.url)
+            player.play(url: source.url, headers: source.headers)
         }
     }
 
@@ -131,7 +134,7 @@ final class AudioPlaybackDeck: NSObject, @preconcurrency AudioPlayerDelegate {
         if player.state == .stopped, let source {
             initialSeek = max(seconds, 0)
             currentEntryID = nil
-            player.play(url: source.url)
+            player.play(url: source.url, headers: source.headers)
             return
         }
         player.seek(to: max(seconds, 0))

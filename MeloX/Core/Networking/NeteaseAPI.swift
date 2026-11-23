@@ -52,7 +52,7 @@ enum APIError: LocalizedError {
 @Observable
 final class NeteaseAPI {
     @ObservationIgnored
-    private let settings: AppSettings
+    let settings: AppSettings
 
     @ObservationIgnored
     private let pathMonitor = NWPathMonitor()
@@ -146,7 +146,7 @@ final class NeteaseAPI {
             let playlists = try await qq.recommendedPlaylists(
                 limit: limit
             )
-            return playlists.map(QQMusicMapper.playlist)
+            return playlists.map { QQMusicMapper.playlist($0) }
         }
         let response: PersonalizedResponse = try await client.eapi(
             "/api/personalized/playlist",
@@ -195,6 +195,12 @@ final class NeteaseAPI {
     }
 
     func playlists(category: String, offset: Int = 0, limit: Int = 50) async throws -> [Playlist] {
+        if isUsingSourceResolver {
+            if category == "排行榜" {
+                return try await toplists()
+            }
+            return try await recommendedPlaylists(limit: limit)
+        }
         switch category {
         case "推荐歌单":
             return try await recommendedPlaylists(limit: limit)
@@ -434,6 +440,26 @@ final class NeteaseAPI {
         limit: Int = 20,
         beforeTime: Int64 = 0
     ) async throws -> SongCommentsResponse {
+        if isUsingSourceResolver {
+            async let pageRequest = qq.songComments(
+                songID: id,
+                offset: offset,
+                limit: limit
+            )
+            async let hotRequest = qq.songHotComments(
+                songID: id,
+                limit: 10
+            )
+            let page = try await pageRequest
+            let hot = (try? await hotRequest) ?? []
+            return SongCommentsResponse(
+                code: 200,
+                hotComments: hot.map(QQMusicMapper.comment),
+                comments: page.comments.map(QQMusicMapper.comment),
+                total: page.total,
+                more: page.hasMore
+            )
+        }
         let path = "/api/v1/resource/comments/R_SO_4_\(id)"
         let data: [String: Any] = [
             "rid": id,
@@ -696,6 +722,25 @@ final class NeteaseAPI {
             response = try await client.weapi(path, data: data)
         }
         return response.data.dailySongs
+    }
+
+    func similarSongs(
+        song: Song,
+        limit: Int = 50
+    ) async throws -> [Song] {
+        guard isUsingSourceResolver else {
+            return try await similarSongs(id: song.id, limit: limit)
+        }
+        let query = "\(song.name) \(song.artistText)"
+        let result = try await qq.search(
+            query: query,
+            kind: .songs,
+            limit: min(max(limit + 5, 1), 50)
+        )
+        return result.songs
+            .filter { $0.id != song.id }
+            .prefix(limit)
+            .map(QQMusicMapper.song)
     }
 
     func similarSongs(id: Int, limit: Int = 50) async throws -> [Song] {

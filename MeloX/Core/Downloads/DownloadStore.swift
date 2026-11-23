@@ -359,7 +359,10 @@ final class DownloadStore {
                 quality: quality
             )
             try Task.checkCancellation()
-            let transfer = try await transferClient.download(from: source.url) { [weak self] progress in
+            let transfer = try await transferClient.download(
+                from: source.url,
+                headers: source.headers
+            ) { [weak self] progress in
                 self?.updateProgress(
                     progress,
                     songID: song.id,

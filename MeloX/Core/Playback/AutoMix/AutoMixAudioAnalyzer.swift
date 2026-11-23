@@ -760,6 +760,7 @@ actor AutoMixAudioAnalyzer {
         do {
             return try await decodeSamples(
                 from: request.source.url,
+                headers: request.source.headers,
                 startTime: startTime,
                 duration: duration
             )
@@ -795,10 +796,20 @@ actor AutoMixAudioAnalyzer {
         let temporaryURL: URL
         let response: URLResponse
         do {
-            (temporaryURL, response) =
-                try await URLSession.shared.download(
-                    from: request.source.url
+            var urlRequest = URLRequest(
+                url: request.source.url
+            )
+            for (key, value) in request.source.headers {
+                urlRequest.setValue(
+                    value,
+                    forHTTPHeaderField: key
                 )
+            }
+            let download = try await URLSession.shared.download(
+                for: urlRequest
+            )
+            temporaryURL = download.0
+            response = download.1
         } catch let error as URLError
             where error.code == .cancelled {
             throw CancellationError()
@@ -876,10 +887,16 @@ actor AutoMixAudioAnalyzer {
 
     private func decodeSamples(
         from url: URL,
+        headers: [String: String] = [:],
         startTime: TimeInterval,
         duration: TimeInterval
     ) async throws -> [Float] {
-        let asset = AVURLAsset(url: url)
+        let asset = headers.isEmpty
+            ? AVURLAsset(url: url)
+            : AVURLAsset(
+                url: url,
+                options: ["AVURLAssetHTTPHeaderFieldsKey": headers]
+            )
         let tracks = try await asset.loadTracks(
             withMediaType: .audio
         )

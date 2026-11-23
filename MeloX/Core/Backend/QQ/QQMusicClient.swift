@@ -395,6 +395,45 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
         }
     }
 
+    func toplistDetail(
+        topID: Int,
+        limit: Int = 100,
+        offset: Int = 0
+    ) async throws -> QQPlaylistDetail {
+        let session = try await anonymousSession()
+        let data = try await cgiCall(
+            module: "music.musicToplist.Toplist",
+            method: "GetDetail",
+            parameter: [
+                "topId": topID,
+                "offset": offset,
+                "num": limit,
+                "withTags": true,
+            ],
+            session: session
+        )
+        let info = Self.dictionary(data["data"]) ?? [:]
+        let songs = QQMusicSearchParser.songs(
+            Self.dictionaryArray(data["songInfoList"])
+        )
+        let total = Self.int(info["totalNum"]) ?? songs.count
+        return QQPlaylistDetail(
+            id: topID,
+            dirid: 0,
+            name: Self.string(info["title"]) ?? "",
+            coverURL: Self.string(info["frontPicUrl"])
+                ?? Self.string(info["headPicUrl"]),
+            description: Self.string(info["intro"]),
+            trackCount: total,
+            playCount: Self.int(info["listenNum"]) ?? 0,
+            creatorName: nil,
+            creatorID: 0,
+            songs: songs,
+            total: total,
+            hasMore: total > offset + songs.count
+        )
+    }
+
     func toplists() async throws -> [QQToplist] {
         let session = try await anonymousSession()
         let data = try await cgiCall(
@@ -459,6 +498,97 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
             }
         }
         return songs
+    }
+
+    // MARK: - Comments
+
+    func songComments(
+        songID: Int,
+        offset: Int = 0,
+        limit: Int = 20
+    ) async throws -> QQCommentPage {
+        let session = try await anonymousSession()
+        let pageSize = min(max(limit, 1), 50)
+        let data = try await cgiCall(
+            module: "music.globalComment.CommentRead",
+            method: "GetNewCommentList",
+            parameter: [
+                "PageSize": pageSize,
+                "PageNum": max(offset, 0) / pageSize,
+                "HashTagID": "",
+                "BizType": 1,
+                "PicEnable": 1,
+                "LastCommentSeqNo": "",
+                "SelfSeeEnable": 1,
+                "BizId": String(songID),
+                "AudioEnable": 1,
+                "BizSubType": 2,
+            ],
+            session: session
+        )
+        let list = Self.dictionary(data["CommentList"]) ?? [:]
+        let comments = Self.comments(
+            Self.dictionaryArray(list["Comments"])
+        )
+        let total = Self.int(list["Total"]) ?? comments.count
+        let hasMore = (Self.int(list["HasMore"]) ?? 0) == 1
+        return QQCommentPage(
+            comments: comments,
+            total: total,
+            hasMore: hasMore,
+            nextOffset: offset + comments.count
+        )
+    }
+
+    func songHotComments(
+        songID: Int,
+        limit: Int = 10
+    ) async throws -> [QQComment] {
+        let session = try await anonymousSession()
+        let data = try await cgiCall(
+            module: "music.globalComment.CommentRead",
+            method: "GetHotCommentList",
+            parameter: [
+                "BizType": 1,
+                "BizId": String(songID),
+                "LastCommentSeqNo": "",
+                "PageSize": min(max(limit, 1), 50),
+                "PageNum": 0,
+                "HotType": 1,
+                "WithAirborne": 0,
+                "PicEnable": 1,
+                "BizSubType": 2,
+            ],
+            session: session
+        )
+        let list = Self.dictionary(data["CommentList"]) ?? [:]
+        return Self.comments(
+            Self.dictionaryArray(list["Comments"])
+        )
+    }
+
+    private static func comments(
+        _ items: [[String: Any]]
+    ) -> [QQComment] {
+        items.compactMap { item in
+            guard let idText = string(item["CmId"]) else {
+                return nil
+            }
+            let id = Int64(idText)
+                ?? QQMusicSearchParser.stableID64(idText)
+            let content = string(item["Content"]) ?? ""
+            guard !content.isEmpty else { return nil }
+            return QQComment(
+                id: id,
+                nickname: string(item["Nick"]) ?? "",
+                avatarURL: string(item["Avatar"]),
+                content: content,
+                publishedAt: int(item["PubTime"]) ?? 0,
+                likedCount: int(item["PraiseNum"]) ?? 0,
+                isLiked: (int(item["IsPraised"]) ?? 0) == 1,
+                replyCount: int(item["ReplyCnt"]) ?? 0
+            )
+        }
     }
 
     // MARK: - Account library

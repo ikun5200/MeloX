@@ -27,6 +27,16 @@ struct HomePagePayload: Codable {
     let hasMore: Bool
     let cursor: String?
 
+    init(
+        blocks: [HomePageBlock] = [],
+        hasMore: Bool = false,
+        cursor: String? = nil
+    ) {
+        self.blocks = blocks
+        self.hasMore = hasMore
+        self.cursor = cursor
+    }
+
     enum CodingKeys: String, CodingKey {
         case blocks, hasMore, cursor
     }

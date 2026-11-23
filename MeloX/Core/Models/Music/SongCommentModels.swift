@@ -146,3 +146,59 @@ struct SongCommentsResponse: Decodable {
         more = try container.decodeIfPresent(Bool.self, forKey: .more) ?? false
     }
 }
+
+extension SongCommentUser {
+    init(id: Int, nickname: String, avatarURLString: String?) {
+        self.id = id
+        self.nickname = nickname
+        self.avatarURLString = avatarURLString
+    }
+}
+
+extension SongCommentFloorSummary {
+    init(replyCount: Int) {
+        self.replyCount = replyCount
+    }
+}
+
+extension SongComment {
+    init(
+        id: Int64,
+        user: SongCommentUser,
+        content: String,
+        time: Double?,
+        timeDescription: String?,
+        likedCount: Int,
+        isLiked: Bool,
+        replies: [SongCommentReply],
+        ipLocation: SongCommentIPLocation?,
+        floorSummary: SongCommentFloorSummary?
+    ) {
+        self.id = id
+        self.user = user
+        self.content = content
+        self.time = time
+        self.timeDescription = timeDescription
+        self.likedCount = likedCount
+        self.isLiked = isLiked
+        self.replies = replies
+        self.ipLocation = ipLocation
+        self.floorSummary = floorSummary
+    }
+}
+
+extension SongCommentsResponse {
+    init(
+        code: Int,
+        hotComments: [SongComment],
+        comments: [SongComment],
+        total: Int,
+        more: Bool
+    ) {
+        self.code = code
+        self.hotComments = hotComments
+        self.comments = comments
+        self.total = total
+        self.more = more
+    }
+}

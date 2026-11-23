@@ -113,7 +113,7 @@ struct HomeRecommendationFallbackLoader {
         }
         return (
             try? await api.similarSongs(
-                id: likedSong.id,
+                song: likedSong,
                 limit: 12
             )
         ) ?? []

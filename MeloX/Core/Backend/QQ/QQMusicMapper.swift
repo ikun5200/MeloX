@@ -114,6 +114,40 @@ nonisolated enum QQMusicMapper {
         )
     }
 
+    static func comment(_ value: QQComment) -> SongComment {
+        SongComment(
+            id: value.id,
+            user: SongCommentUser(
+                id: QQMusicSearchParser.stableID(String(value.id)),
+                nickname: value.nickname,
+                avatarURLString: value.avatarURL
+            ),
+            content: value.content,
+            time: Double(value.publishedAt) * 1_000,
+            timeDescription: nil,
+            likedCount: value.likedCount,
+            isLiked: value.isLiked,
+            replies: [],
+            ipLocation: nil,
+            floorSummary: nil
+        )
+    }
+
+    static func toplistDetail(_ value: QQPlaylistDetail) -> Playlist {
+        let songs = value.songs.map(song)
+        return Playlist(
+            id: value.id,
+            name: value.name,
+            coverURLString: value.coverURL,
+            playlistDescription: value.description,
+            trackCount: value.trackCount,
+            playCount: value.playCount,
+            toplistType: "qq",
+            tracks: songs,
+            trackIDs: songs.map { TrackReference(id: $0.id) }
+        )
+    }
+
     static func toplist(_ value: QQToplist) -> Playlist {
         Playlist(
             id: value.id,
