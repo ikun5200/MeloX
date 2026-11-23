@@ -245,7 +245,7 @@ struct HomeRecommendedView: View {
             throw HomePlaybackActionError.songRequired
         }
         let songs = try await api.similarSongs(
-            id: currentSong.id,
+            song: currentSong,
             limit: 50
         )
         guard !songs.isEmpty else {

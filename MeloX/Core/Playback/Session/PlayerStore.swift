@@ -1891,7 +1891,7 @@ final class PlayerStore {
 
         do {
             let recommendations = try await api.similarSongs(
-                id: currentSong.id
+                song: currentSong
             )
             guard isAutoplayEnabled else { return }
             let existingSongIDs = Set(queue.map(\.id))

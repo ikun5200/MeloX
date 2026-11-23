@@ -73,6 +73,7 @@ struct SearchView: View {
                     description: Text(message)
                 )
             } else if recognizedLink == nil,
+                      linkedQQSong == nil,
                       !trimmedQuery.isEmpty,
                       phase == .loaded,
                       resultIsEmpty {
