@@ -76,10 +76,6 @@ struct GeneralSettingsView: View {
                 }
             }
 
-            Section {
-                EmptyView()
-            }
-
             Section("ui.navigation.search") {
                 Toggle("ui.settings.general.search_suggestions", isOn: $settings.searchSuggestionsEnabled)
             }

@@ -18,8 +18,11 @@ struct MVDetailView: View {
             Section {
                 VStack(spacing: 14) {
                     ArtworkImage(
-                        url: detail?.coverURL.flatMap(URL.init(string:))
-                            ?? context.artworkURLString.flatMap(URL.init(string:)),
+                        url: makeArtworkURL(
+                            from: detail?.coverURL
+                                ?? context.artworkURLString,
+                            dimension: 960
+                        ),
                         cornerRadius: 12
                     )
                     .frame(maxWidth: .infinity)
