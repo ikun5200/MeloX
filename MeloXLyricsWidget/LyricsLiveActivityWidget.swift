@@ -17,27 +17,44 @@ struct LyricsLiveActivityWidget: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    artwork(context.state, size: 42)
-                        .widgetURL(Self.nowPlayingURL)
+                    Link(destination: Self.nowPlayingURL) {
+                        artwork(context.state, size: 42)
+                    }
                 }
 
                 DynamicIslandExpandedRegion(.trailing) {
-                    Image(
-                        systemName: context.state.isPlaying
-                            ? "waveform"
-                            : "pause.fill"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .widgetURL(Self.nowPlayingURL)
+                    Link(destination: Self.nowPlayingURL) {
+                        Image(
+                            systemName: context.state.isPlaying
+                                ? "waveform"
+                                : "pause.fill"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+
+                // Keep the empty middle of the expanded island tappable;
+                // otherwise a tap between the artwork and the bottom text
+                // does nothing.
+                DynamicIslandExpandedRegion(.center) {
+                    Link(destination: Self.nowPlayingURL) {
+                        Color.white.opacity(0.001)
+                            .frame(
+                                maxWidth: .infinity,
+                                maxHeight: .infinity
+                            )
+                            .contentShape(.rect)
+                    }
                 }
 
                 DynamicIslandExpandedRegion(
                     .bottom,
                     priority: 1
                 ) {
-                    expandedContent(context.state)
-                        .widgetURL(Self.nowPlayingURL)
+                    Link(destination: Self.nowPlayingURL) {
+                        expandedContent(context.state)
+                    }
                 }
             } compactLeading: {
                 compactLeadingContent(context.state)
@@ -49,6 +66,7 @@ struct LyricsLiveActivityWidget: Widget {
                 artwork(context.state, size: 24)
                     .widgetURL(Self.nowPlayingURL)
             }
+            .widgetURL(Self.nowPlayingURL)
             .keylineTint(.red)
         }
     }

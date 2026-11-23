@@ -14,6 +14,7 @@ struct NowPlayingAppleMusicBackground: View {
 
     let artworkURL: URL?
     let isBehindLyrics: Bool
+    let isTransitioning: Bool
     let motionIntensity: Double
     let saturation: Double
     let audioResponseEnabled: Bool
@@ -24,12 +25,14 @@ struct NowPlayingAppleMusicBackground: View {
     init(
         artworkURL: URL?,
         isBehindLyrics: Bool,
+        isTransitioning: Bool = false,
         motionIntensity: Double,
         saturation: Double,
         audioResponseEnabled: Bool
     ) {
         self.artworkURL = artworkURL
         self.isBehindLyrics = isBehindLyrics
+        self.isTransitioning = isTransitioning
         self.motionIntensity = motionIntensity
         self.saturation = saturation
         self.audioResponseEnabled = audioResponseEnabled
@@ -40,8 +43,7 @@ struct NowPlayingAppleMusicBackground: View {
         GeometryReader { proxy in
             TimelineView(
                 .animation(
-                    minimumInterval:
-                        effectiveLyricsRefreshRate.minimumInterval,
+                    minimumInterval: backdropRefreshInterval,
                     paused: pausesAnimation
                 )
             ) { context in
@@ -160,6 +162,16 @@ struct NowPlayingAppleMusicBackground: View {
             || isLuminanceReduced
             || scenePhase != .active
             || !player.isPlaying
+    }
+
+    private var backdropRefreshInterval: TimeInterval {
+        // The ambient shader is expensive and changes slowly. Capping it
+        // at 60Hz keeps it visually identical while leaving GPU headroom
+        // for page transitions; 30Hz is enough while the cover is moving.
+        if isTransitioning {
+            return 1.0 / 30.0
+        }
+        return max(effectiveLyricsRefreshRate.minimumInterval, 1.0 / 60.0)
     }
 
     private var effectiveSpectrum:

@@ -12,6 +12,8 @@ struct NowPlayingView: View {
     @Environment(PlayerStore.self) private var player
     @Environment(AppSettings.self) private var settings
     @Environment(LyricsStore.self) private var lyricsStore
+    @Environment(\.effectiveLyricsRefreshRate)
+    private var effectiveLyricsRefreshRate
 
     @State private var pageTransition: NowPlayingTransitionCoordinator
     @State private var showsLyricsControls = true
@@ -54,7 +56,9 @@ struct NowPlayingView: View {
                         beatTimeline:
                             player.currentBeatTimeline,
                         isBehindLyrics:
-                            page == .lyrics
+                            page == .lyrics,
+                        isTransitioning:
+                            pageTransition.transition != nil
                     )
                 }
 
@@ -538,8 +542,7 @@ struct NowPlayingView: View {
 
                     NowPlayingPortraitArtwork(
                         song: song,
-                        isArtworkPage: page == .artwork,
-                        cornerRadius: 12 / max(artworkScale, 0.01)
+                        isArtworkPage: page == .artwork
                     )
                     .frame(
                         width: artworkPageFrame.width,
@@ -739,6 +742,13 @@ struct NowPlayingView: View {
                 setAppleMusicLyricsControlsVisible,
             onInitialFocusPrepared: onInitialFocusPrepared
         )
+        // Keep the lyrics focus cascade at 60Hz while the page is moving.
+        // The cover transition then has the GPU budget to stay smooth;
+        // the user's full refresh rate resumes once the page settles.
+        .environment(
+            \.effectiveLyricsRefreshRate,
+            transitionLyricsRefreshRate
+        )
         .accessibilityAction(
             named: lyricsInterfaceAccessibilityActionName
         ) {
@@ -842,6 +852,15 @@ struct NowPlayingView: View {
 
     private var isPortraitArtworkExpanded: Bool {
         player.isPlaying || !settings.shrinksPausedArtwork
+    }
+
+    private var transitionLyricsRefreshRate: LyricsRefreshRate {
+        guard pageTransition.transition != nil else {
+            return effectiveLyricsRefreshRate
+        }
+        return effectiveLyricsRefreshRate == .fps30
+            ? .fps30
+            : .fps60
     }
 
     private var sharedPortraitSongHeaderOffset: CGFloat {

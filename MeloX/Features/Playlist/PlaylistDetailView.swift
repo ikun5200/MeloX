@@ -46,7 +46,7 @@ struct PlaylistDetailView: View {
         )
         id = context.id
         initialPlaylist = context.playlistSummary
-        prefersToplistLayout = false
+        prefersToplistLayout = context.playlistSummary.isOfficialToplist
         _artworkPalette = State(initialValue: cachedAssets?.palette)
         _blurredBackdropImage = State(
             initialValue: cachedAssets?.blurredBackdropImage

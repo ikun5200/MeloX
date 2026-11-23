@@ -8,6 +8,7 @@ struct NowPlayingBackground: View {
     let artworkURL: URL?
     let beatTimeline: PlaybackBeatTimeline?
     let isBehindLyrics: Bool
+    let isTransitioning: Bool
 
     @State private var flowingLightPalette:
         ArtworkFlowingLightPalette
@@ -15,11 +16,13 @@ struct NowPlayingBackground: View {
     init(
         artworkURL: URL?,
         beatTimeline: PlaybackBeatTimeline?,
-        isBehindLyrics: Bool
+        isBehindLyrics: Bool,
+        isTransitioning: Bool = false
     ) {
         self.artworkURL = artworkURL
         self.beatTimeline = beatTimeline
         self.isBehindLyrics = isBehindLyrics
+        self.isTransitioning = isTransitioning
         _flowingLightPalette = State(
             initialValue:
                 ArtworkAccentColorProvider
@@ -75,6 +78,7 @@ struct NowPlayingBackground: View {
             NowPlayingAppleMusicBackground(
                 artworkURL: artworkURL,
                 isBehindLyrics: isBehindLyrics,
+                isTransitioning: isTransitioning,
                 motionIntensity:
                     settings.playerBackgroundMotionIntensity,
                 saturation:

@@ -104,7 +104,9 @@ enum MusicRoute: Hashable {
     case toplists
 
     static func playlist(_ playlist: Playlist) -> Self {
-        .playlist(PlaylistRouteContext(playlist))
+        playlist.isOfficialToplist
+            ? .toplist(PlaylistRouteContext(playlist))
+            : .playlist(PlaylistRouteContext(playlist))
     }
 
     static func toplist(_ playlist: Playlist) -> Self {

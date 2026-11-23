@@ -3,6 +3,8 @@ import SwiftUI
 
 @main
 struct MeloXApp: App {
+    @UIApplicationDelegateAdaptor(MeloXAppDelegate.self)
+    private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var settings: AppSettings

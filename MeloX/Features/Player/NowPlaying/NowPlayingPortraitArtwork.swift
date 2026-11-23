@@ -11,21 +11,24 @@ struct NowPlayingPortraitArtwork: View {
 
     let song: Song
     let isArtworkPage: Bool
-    var cornerRadius: CGFloat = 12
 
     @State private var bounceScale: CGFloat = 1
 
     var body: some View {
         ArtworkImage(
             url: song.album?.artworkURL,
-            cornerRadius: cornerRadius
+            cornerRadius: 12
         )
+        .background {
+            // A static blurred shape scales with the artwork, so the
+            // compositor can reuse it instead of re-rendering a dynamic
+            // shadow on every frame of the lyrics transition.
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.black.opacity(shadowOpacity))
+                .blur(radius: 26)
+                .offset(y: 15)
+        }
         .scaleEffect(bounceScale)
-        .shadow(
-            color: .black.opacity(shadowOpacity),
-            radius: shadowRadius,
-            y: shadowOffset
-        )
         .animation(
             accessibilityReduceMotion
                 ? nil
@@ -34,13 +37,9 @@ struct NowPlayingPortraitArtwork: View {
         )
         .accessibilityElement()
         .accessibilityLabel(L10n.format("ui.song.artwork_accessibility", song.name))
-        .task(id: shouldBounce) {
+        .task(id: player.isPlaying) {
             await animateBounce()
         }
-    }
-
-    private var shouldBounce: Bool {
-        isArtworkPage && player.isPlaying
     }
 
     private var shadowOpacity: Double {
@@ -48,19 +47,9 @@ struct NowPlayingPortraitArtwork: View {
         return player.isPlaying ? 0.34 : 0.18
     }
 
-    private var shadowRadius: CGFloat {
-        guard isArtworkPage else { return 0 }
-        return player.isPlaying ? 26 : 14
-    }
-
-    private var shadowOffset: CGFloat {
-        guard isArtworkPage else { return 0 }
-        return player.isPlaying ? 15 : 8
-    }
-
     private func animateBounce() async {
         bounceScale = 1
-        guard shouldBounce, !accessibilityReduceMotion else {
+        guard isArtworkPage, player.isPlaying, !accessibilityReduceMotion else {
             return
         }
 

@@ -36,6 +36,8 @@ struct ContentView: View {
     @State private var isTabViewBottomAccessorySuppressed = false
     @State private var hasRestoredPlayback = false
     @State private var pendingNowPlayingDeepLink = false
+    @State private var deepLinkRouter = DeepLinkRouter.shared
+    @State private var handledDeepLinkRequestCount = 0
     @State private var hasHandledHeartModeLaunch = false
     @State private var heartModeLaunchErrorMessage: String?
     @Namespace private var playerTransitionNamespace
@@ -116,6 +118,9 @@ struct ContentView: View {
                 await player.restore()
                 guard !Task.isCancelled else { return }
                 hasRestoredPlayback = true
+                handleNowPlayingDeepLinkRequest(
+                    deepLinkRouter.nowPlayingRequestCount
+                )
                 presentPlayerFromDeepLinkIfPossible()
             }
             .task(
@@ -138,6 +143,10 @@ struct ContentView: View {
             }
             .task(id: api.accountScope) {
                 await library.refresh()
+            }
+            .onChange(of: deepLinkRouter.nowPlayingRequestCount) {
+                _, count in
+                handleNowPlayingDeepLinkRequest(count)
             }
             .background(alignment: .topLeading) {
                 FloatingLyricsPictureInPictureSource(
@@ -182,6 +191,7 @@ struct ContentView: View {
                 player.refreshLyricsNotification()
                 guard phase == .active else { return }
                 player.refreshLyricsLiveActivity()
+                presentPlayerFromDeepLinkIfPossible()
             }
             .onChange(of: floatingLyrics.restorationRequestID) {
                 guard floatingLyrics.restorationRequestID > 0,
@@ -466,14 +476,21 @@ struct ContentView: View {
     }
 
     private func handleOpenURL(_ url: URL) {
-        guard url.scheme?.lowercased() == "melox",
-              url.host?.lowercased() == "now-playing" else { return }
+        deepLinkRouter.handle(url)
+    }
+
+    private func handleNowPlayingDeepLinkRequest(_ count: Int) {
+        guard count > handledDeepLinkRequestCount else { return }
+        handledDeepLinkRequestCount = count
         pendingNowPlayingDeepLink = true
         presentPlayerFromDeepLinkIfPossible()
     }
 
     private func presentPlayerFromDeepLinkIfPossible() {
         guard pendingNowPlayingDeepLink, hasRestoredPlayback else { return }
+        // Presenting while the scene is still inactive can be dropped by
+        // SwiftUI; wait until the app is actually on screen.
+        guard scenePhase == .active else { return }
         pendingNowPlayingDeepLink = false
         guard player.currentSong != nil, playerPresentation == nil else { return }
         presentPlayer()
