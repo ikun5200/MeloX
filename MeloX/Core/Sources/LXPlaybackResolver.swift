@@ -109,7 +109,9 @@ final class LXPlaybackResolver {
                                 for: url,
                                 quality: candidate
                             ),
-                            quality: quality,
+                            quality: LXQualityMapping.quality(
+                                for: candidate
+                            ) ?? quality,
                             headers: [:],
                             sourceName: source.name,
                             qualityVerified: false

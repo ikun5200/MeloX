@@ -541,7 +541,8 @@ struct PlaylistDetailView: View {
             } else {
                 loadedPlaylist = try await api.playlist(
                     id: id,
-                    trackLimit: requestedTrackLimit
+                    trackLimit: requestedTrackLimit,
+                    dirid: initialPlaylist.dirid
                 )
             }
             guard loadedPlaylist.trackCount == 0 || !loadedPlaylist.tracks.isEmpty else {

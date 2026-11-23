@@ -234,11 +234,13 @@ final class NeteaseAPI {
 
     func playlist(
         id: Int,
-        trackLimit: Int? = 100
+        trackLimit: Int? = 100,
+        dirid: Int = 0
     ) async throws -> Playlist {
         if resolver != nil {
             let detail = try await qq.playlistDetail(
                 id: id,
+                dirid: dirid,
                 limit: min(max(trackLimit ?? 100, 1), 100)
             )
             return QQMusicMapper.playlist(detail)
