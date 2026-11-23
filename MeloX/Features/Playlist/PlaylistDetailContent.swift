@@ -251,6 +251,7 @@ private struct ToplistDetailHero: View {
 
     @Environment(LibraryStore.self) private var library
     @Environment(\.musicCollectionDetailMetrics) private var detailMetrics
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     @ViewBuilder
     var body: some View {
