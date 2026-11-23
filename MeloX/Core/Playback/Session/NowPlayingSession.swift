@@ -62,9 +62,9 @@ final class NowPlayingSession {
             MPNowPlayingInfoPropertyIsLiveStream: false,
             MPNowPlayingInfoPropertyExternalContentIdentifier:
                 song.podcastMetadata.map {
-                    "netease:djprogram:\($0.programID)"
-                } ?? "netease:song:\(song.id)",
-            MPNowPlayingInfoPropertyServiceIdentifier: "netease-cloud-music",
+                    "qqmusic:djprogram:\($0.programID)"
+                } ?? "qqmusic:song:\(song.id)",
+            MPNowPlayingInfoPropertyServiceIdentifier: "com.melox.qqmusic",
             MPNowPlayingInfoPropertyPlaybackQueueIndex: max(queueIndex, 0),
             MPNowPlayingInfoPropertyPlaybackQueueCount: max(queueCount, 1),
         ]
@@ -72,9 +72,9 @@ final class NowPlayingSession {
             nowPlayingInfo[MPMediaItemPropertyPodcastTitle] =
                 podcast.radioName
             nowPlayingInfo[MPNowPlayingInfoCollectionIdentifier] =
-                "netease:djradio:\(podcast.radioID)"
+                "qqmusic:djradio:\(podcast.radioID)"
         } else if let albumID = song.album?.id {
-            nowPlayingInfo[MPNowPlayingInfoCollectionIdentifier] = "netease:album:\(albumID)"
+            nowPlayingInfo[MPNowPlayingInfoCollectionIdentifier] = "qqmusic:album:\(albumID)"
         }
         nowPlayingCenter.nowPlayingInfo = nowPlayingInfo
         loadArtwork(from: song.album?.artworkURL, songID: song.id)
