@@ -14,11 +14,11 @@ final class PageContentCache {
 
     func value<Value: Decodable>(for key: String) async -> Value? {
         guard settings.automaticallyCachesPageContent else { return nil }
-        let scope = Self.scope(for: settings.cookie)
+        let scope = Self.scope(for: settings.accountCacheScope)
         guard let data = await storage.data(scope: scope, key: key),
               !Task.isCancelled,
               settings.automaticallyCachesPageContent,
-              scope == Self.scope(for: settings.cookie) else { return nil }
+              scope == Self.scope(for: settings.accountCacheScope) else { return nil }
         return try? JSONDecoder().decode(Value.self, from: data)
     }
 
@@ -26,11 +26,11 @@ final class PageContentCache {
         guard settings.automaticallyCachesPageContent,
               !Task.isCancelled,
               let data = try? JSONEncoder().encode(value) else { return }
-        await storage.store(data, scope: Self.scope(for: settings.cookie), key: key)
+        await storage.store(data, scope: Self.scope(for: settings.accountCacheScope), key: key)
     }
 
-    func removeAccount(cookie: String) async {
-        await storage.remove(scope: Self.scope(for: cookie))
+    func removeAccount(scope: String) async {
+        await storage.remove(scope: Self.scope(for: scope))
     }
 
     static func clear() async {

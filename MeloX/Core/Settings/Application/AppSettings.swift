@@ -293,6 +293,14 @@ final class AppSettings {
         qqCredential.accountScopeID
     }
 
+    /// 页面缓存和账号级数据使用的稳定身份。QQ 登录后使用不可逆的账号指纹，
+    /// 避免把票据写入缓存目录或日志。
+    var accountCacheScope: String {
+        qqCredential.isValid
+            ? "qq:\(qqCredential.accountScopeID)"
+            : cookie
+    }
+
     func saveQQCredential(_ credential: QQCredential) {
         qqCredential = credential
         if let data = try? JSONEncoder().encode(credential) {

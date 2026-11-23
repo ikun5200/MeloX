@@ -113,6 +113,30 @@ final class NeteaseAPI {
         resolver != nil
     }
 
+    var hasAccount: Bool {
+        isUsingSourceResolver
+            ? settings.qqCredential.isValid
+            : !settings.cookie.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// 账号维度缓存键。QQ 使用 musicID，避免把登录票据写进页面缓存目录名。
+    var accountScope: String {
+        if isUsingSourceResolver {
+            guard settings.qqCredential.isValid else { return "" }
+            return "qq:\(settings.qqCredential.musicID)"
+        }
+        return settings.cookie.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func clearAccount() {
+        if isUsingSourceResolver {
+            settings.clearQQCredential()
+            updateQQCredential(.empty)
+        } else {
+            settings.clearAccount()
+        }
+    }
+
     var sourcePlaybackQualities: [MusicQuality] {
         resolver?.supportedQualities ?? []
     }
@@ -240,6 +264,10 @@ final class NeteaseAPI {
     }
 
     func albumSubscriptionStatus(id: Int) async throws -> Bool {
+        if isUsingSourceResolver {
+            // 收藏列表已在 LibraryStore 中维护，单曲专辑页不再额外探测。
+            throw APIError.invalidResponse
+        }
         let response: AlbumDynamicResponse = try await client.weapi(
             "/api/album/detail/dynamic",
             data: ["id": id]
@@ -249,6 +277,13 @@ final class NeteaseAPI {
     }
 
     func setAlbumSubscribed(id: Int, isSubscribed: Bool) async throws {
+        if isUsingSourceResolver {
+            try await qq.setAlbumSubscribed(
+                id: id,
+                isSubscribed: isSubscribed
+            )
+            return
+        }
         let path = isSubscribed ? "/api/album/sub" : "/api/album/unsub"
         let response: APIStatusResponse = try await client.weapi(
             path,
@@ -278,6 +313,10 @@ final class NeteaseAPI {
 
     func songDetails(ids: [Int]) async throws -> [Song] {
         guard !ids.isEmpty else { return [] }
+        if isUsingSourceResolver {
+            return try await qq.songDetails(ids: ids)
+                .map(QQMusicMapper.song)
+        }
         let songs = ids.map { ["id": $0] }
         let songsData = try JSONSerialization.data(withJSONObject: songs)
         guard let songsJSON = String(data: songsData, encoding: .utf8) else {
@@ -730,6 +769,26 @@ final class NeteaseAPI {
     }
 
     func accountProfile() async throws -> AccountProfile {
+        if isUsingSourceResolver {
+            let credential = settings.qqCredential
+            guard credential.isValid else { throw APIError.notLoggedIn }
+            return AccountProfile(
+                id: credential.musicID,
+                nickname: credential.nickName.isEmpty
+                    ? String(credential.musicID)
+                    : credential.nickName,
+                avatarURLString: credential.avatarURL.isEmpty
+                    ? nil
+                    : credential.avatarURL,
+                backgroundURLString: nil,
+                signature: nil,
+                follows: nil,
+                followeds: nil,
+                eventCount: nil,
+                playlistCount: nil,
+                playlistBeSubscribedCount: nil
+            )
+        }
         do {
             let response: AccountResponse = try await client.eapi(
                 "/api/w/nuser/account/get",
@@ -756,6 +815,15 @@ final class NeteaseAPI {
     }
 
     func userDetail(userID: Int) async throws -> AccountDetail {
+        if isUsingSourceResolver {
+            let profile = try await accountProfile()
+            return AccountDetail(
+                profile: profile,
+                level: 0,
+                listenSongs: 0,
+                createDays: nil
+            )
+        }
         let response: AccountDetailResponse
         do {
             // Mirrors @neteaseapireborn/api/module/user_detail.js.
@@ -789,6 +857,10 @@ final class NeteaseAPI {
         userID: Int,
         likedPlaylistID: Int? = nil
     ) async throws -> [Int] {
+        if isUsingSourceResolver {
+            let detail = try await qq.likedSongs(limit: 1_000)
+            return detail.songs.map(\.id)
+        }
         if let likedPlaylistID {
             do {
                 // Only request playlist metadata and ordered track IDs here.
@@ -819,7 +891,30 @@ final class NeteaseAPI {
         return response.ids
     }
 
+    func sourceLikedSongs(limit: Int = 1_000) async throws -> [Song] {
+        let detail = try await qq.likedSongs(limit: limit)
+        return detail.songs.map(QQMusicMapper.song)
+    }
+
     func userPlaylists(userID: Int, limit: Int = 2_000) async throws -> [Playlist] {
+        if isUsingSourceResolver {
+            let credential = settings.qqCredential
+            guard credential.isValid else { throw APIError.notLoggedIn }
+            let created = try await qq.createdPlaylists()
+            let saved = (try? await qq.favoritePlaylists(limit: limit)) ?? []
+            let createdPlaylists = created
+                .filter { $0.id > 0 && $0.dirid != 201 }
+                .map {
+                    QQMusicMapper.playlist(
+                        $0,
+                        creatorID: credential.musicID
+                    )
+                }
+            let savedPlaylists = saved.map {
+                QQMusicMapper.playlist($0, subscribed: true)
+            }
+            return createdPlaylists + savedPlaylists
+        }
         // YesPlayMusic intentionally asks for at most 2,000 playlists in one
         // request. Paging this route caused later empty responses to discard an
         // otherwise valid first page.
@@ -1044,6 +1139,10 @@ final class NeteaseAPI {
     }
 
     func setSongLiked(id: Int, isLiked: Bool) async throws {
+        if isUsingSourceResolver {
+            try await qq.setSongLiked(songID: id, isLiked: isLiked)
+            return
+        }
         let response: APIStatusResponse = try await client.eapi(
             "/api/radio/like",
             data: [
@@ -1058,6 +1157,13 @@ final class NeteaseAPI {
     }
 
     func setPlaylistSubscribed(id: Int, isSubscribed: Bool) async throws {
+        if isUsingSourceResolver {
+            try await qq.setPlaylistSubscribed(
+                id: id,
+                isSubscribed: isSubscribed
+            )
+            return
+        }
         // Match the website's WEAPI route; an empty response does not prove the write failed.
         let path = isSubscribed ? "/api/playlist/subscribe" : "/api/playlist/unsubscribe"
         let response: APIStatusResponse = try await client.weapi(
@@ -1068,7 +1174,19 @@ final class NeteaseAPI {
         try validate(responseCode: response.code, message: response.message)
     }
 
-    func addSong(id: Int, toPlaylistID playlistID: Int) async throws {
+    func addSong(
+        id: Int,
+        toPlaylistID playlistID: Int,
+        dirid: Int = 0
+    ) async throws {
+        if isUsingSourceResolver {
+            try await qq.addSong(
+                songID: id,
+                to: dirid > 0 ? dirid : playlistID,
+                tid: playlistID
+            )
+            return
+        }
         try await manipulatePlaylistTrack(id: id, playlistID: playlistID, operation: "add")
     }
 

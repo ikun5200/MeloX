@@ -30,7 +30,7 @@ struct SettingsAccountSection: View {
                 logoutCard
             }
         }
-        .task(id: settings.cookie) {
+        .task(id: "\(settings.cookie):\(settings.qqAccountScopeID)") {
             await library.refresh()
         }
         .sheet(item: $presentedSheet) { destination in
@@ -228,6 +228,9 @@ struct SettingsAccountSection: View {
     }
 
     private func logout() {
+        if settings.isQQLoggedIn {
+            settings.clearQQCredential()
+        }
         settings.clearAccount()
         library.clearAccountData()
         Task {

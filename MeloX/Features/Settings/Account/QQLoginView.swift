@@ -21,6 +21,7 @@ struct QQLoginView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppSettings.self) private var settings
     @Environment(NeteaseAPI.self) private var api
+    @Environment(LibraryStore.self) private var library
 
     @State private var service = QQLoginService()
     @State private var mode: Mode = .qq
@@ -301,6 +302,7 @@ struct QQLoginView: View {
     private func completeLogin(_ credential: QQCredential) {
         settings.saveQQCredential(credential)
         api.updateQQCredential(credential)
+        Task { await library.refresh(force: true) }
         dismiss()
     }
 }

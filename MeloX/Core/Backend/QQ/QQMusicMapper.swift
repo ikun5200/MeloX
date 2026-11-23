@@ -59,7 +59,11 @@ nonisolated enum QQMusicMapper {
         )
     }
 
-    static func playlist(_ value: QQSearchPlaylist) -> Playlist {
+    static func playlist(
+        _ value: QQSearchPlaylist,
+        creatorID: Int = 0,
+        subscribed: Bool = false
+    ) -> Playlist {
         Playlist(
             id: value.id,
             name: value.name,
@@ -67,9 +71,10 @@ nonisolated enum QQMusicMapper {
             trackCount: value.trackCount,
             playCount: value.playCount,
             creator: UserSummary(
-                userID: 0,
+                userID: creatorID,
                 nickname: value.creatorName ?? ""
             ),
+            subscribed: subscribed,
             dirid: value.dirid
         )
     }

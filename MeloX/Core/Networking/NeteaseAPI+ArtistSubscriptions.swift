@@ -2,6 +2,10 @@ import Foundation
 
 extension NeteaseAPI {
     func subscribedArtists(limit: Int = 2_000) async throws -> [Artist] {
+        if isUsingSourceResolver {
+            return try await qq.followedArtists(limit: limit)
+                .map(QQMusicMapper.artist)
+        }
         let path = "/api/artist/sublist"
         let data: [String: Any] = [
             "limit": max(limit, 1),
@@ -26,6 +30,10 @@ extension NeteaseAPI {
     }
 
     func setArtistFollowed(id: Int, isFollowed: Bool) async throws {
+        if isUsingSourceResolver {
+            // QQ 音乐没有公开的歌手关注写接口，列表只做只读展示。
+            throw APIError.invalidResponse
+        }
         let path = isFollowed ? "/api/artist/sub" : "/api/artist/unsub"
         let data: [String: Any] = [
             "artistId": id,

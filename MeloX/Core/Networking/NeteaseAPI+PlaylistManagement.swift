@@ -1,7 +1,19 @@
 import Foundation
 
 extension NeteaseAPI {
-    func removeSong(id: Int, fromPlaylistID playlistID: Int) async throws {
+    func removeSong(
+        id: Int,
+        fromPlaylistID playlistID: Int,
+        dirid: Int = 0
+    ) async throws {
+        if isUsingSourceResolver {
+            try await qq.removeSong(
+                songID: id,
+                from: dirid > 0 ? dirid : playlistID,
+                tid: playlistID
+            )
+            return
+        }
         try await manipulatePlaylistTrack(id: id, playlistID: playlistID, operation: "del")
     }
 
@@ -25,7 +37,11 @@ extension NeteaseAPI {
         try validate(responseCode: response.code, message: response.message)
     }
 
-    func deletePlaylist(id: Int) async throws {
+    func deletePlaylist(id: Int, dirid: Int = 0) async throws {
+        if isUsingSourceResolver {
+            try await qq.deletePlaylist(dirid: dirid > 0 ? dirid : id)
+            return
+        }
         // Mirrors @neteaseapireborn/api/module/playlist_delete.js.
         let response: APIStatusResponse = try await client.weapi(
             "/api/playlist/remove",
@@ -35,6 +51,18 @@ extension NeteaseAPI {
     }
 
     func createPlaylist(name: String, isPrivate: Bool) async throws -> Playlist {
+        if isUsingSourceResolver {
+            let created = try await qq.createPlaylist(name: name)
+            return Playlist(
+                id: created.id,
+                name: created.name,
+                creator: UserSummary(
+                    userID: settings.qqCredential.musicID,
+                    nickname: settings.qqCredential.nickName
+                ),
+                dirid: created.dirid
+            )
+        }
         // Mirrors @neteaseapireborn/api/module/playlist_create.js.
         let response: PlaylistCreationResponse = try await client.weapi(
             "/api/playlist/create",

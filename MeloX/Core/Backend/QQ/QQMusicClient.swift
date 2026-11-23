@@ -120,23 +120,49 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
 
     func playlistDetail(
         id: Int,
+        dirid: Int = 0,
         limit: Int = 100,
         offset: Int = 0
     ) async throws -> QQPlaylistDetail {
-        let session = try await anonymousSession()
+        var anonymous: (uid: String, sid: String)?
+        if credential?.isValid != true {
+            anonymous = try await anonymousSession()
+        }
+        return try await fetchPlaylistDetail(
+            id: id,
+            dirid: dirid,
+            limit: limit,
+            offset: offset,
+            session: anonymous
+        )
+    }
+
+    private func fetchPlaylistDetail(
+        id: Int,
+        dirid: Int,
+        limit: Int,
+        offset: Int,
+        session: (uid: String, sid: String)?
+    ) async throws -> QQPlaylistDetail {
+        var parameter: [String: Any] = [
+            "disstid": id,
+            "dirid": dirid,
+            "tag": true,
+            "song_begin": offset,
+            "song_num": limit,
+            "userinfo": true,
+            "orderlist": true,
+            "onlysonglist": false,
+        ]
+        if dirid == Self.likedSongsDirid,
+           let encryptedUIN = credential?.encryptUIN,
+           !encryptedUIN.isEmpty {
+            parameter["enc_host_uin"] = encryptedUIN
+        }
         let data = try await cgiCall(
             module: "music.srfDissInfo.DissInfo",
             method: "CgiGetDiss",
-            parameter: [
-                "disstid": id,
-                "dirid": 0,
-                "tag": true,
-                "song_begin": offset,
-                "song_num": limit,
-                "userinfo": true,
-                "orderlist": true,
-                "onlysonglist": false,
-            ],
+            parameter: parameter,
             session: session
         )
 
@@ -400,6 +426,333 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
         return result
     }
 
+    // MARK: - Song details
+
+    func songDetails(ids: [Int]) async throws -> [QQSearchSong] {
+        guard !ids.isEmpty else { return [] }
+        var songs: [QQSearchSong] = []
+        let batchSize = 20
+        for start in stride(from: 0, to: ids.count, by: batchSize) {
+            let chunk = Array(
+                ids[start..<min(start + batchSize, ids.count)]
+            )
+            var payload: [String: Any] = [
+                "comm": buildComm(session: nil),
+            ]
+            for (index, id) in chunk.enumerated() {
+                payload["req_\(index)"] = [
+                    "module": "music.pf_song_detail_svr",
+                    "method": "get_song_detail_yqq",
+                    "param": ["song_id": id],
+                ]
+            }
+            let json = try await postJSON(payload)
+            for index in chunk.indices {
+                guard let request = json["req_\(index)"] as? [String: Any],
+                      (request["code"] as? Int ?? -1) == 0,
+                      let data = request["data"] as? [String: Any],
+                      let track = data["track_info"] as? [String: Any],
+                      let song = QQMusicSearchParser.song(track) else {
+                    continue
+                }
+                songs.append(song)
+            }
+        }
+        return songs
+    }
+
+    // MARK: - Account library
+
+    private static let likedSongsDirid = 201
+
+    func likedSongs(
+        limit: Int = 500,
+        offset: Int = 0
+    ) async throws -> QQPlaylistDetail {
+        _ = try requireCredential()
+        return try await fetchPlaylistDetail(
+            id: 0,
+            dirid: Self.likedSongsDirid,
+            limit: limit,
+            offset: offset,
+            session: nil
+        )
+    }
+
+    func createdPlaylists() async throws -> [QQSearchPlaylist] {
+        let credential = try requireCredential()
+        let data = try await authenticatedCall(
+            module: "music.musicasset.PlaylistBaseRead",
+            method: "GetPlaylistByUin",
+            parameter: ["uin": String(credential.musicID)]
+        )
+        return Self.dictionaryArray(data["v_playlist"])
+            .compactMap { Self.userPlaylist($0) }
+    }
+
+    func favoritePlaylists(limit: Int = 200) async throws -> [QQSearchPlaylist] {
+        let credential = try requireCredential()
+        guard !credential.encryptUIN.isEmpty else { return [] }
+        let data = try await authenticatedCall(
+            module: "music.musicasset.PlaylistFavRead",
+            method: "CgiGetPlaylistFavInfo",
+            parameter: [
+                "uin": credential.encryptUIN,
+                "offset": 0,
+                "size": limit,
+            ]
+        )
+        return Self.dictionaryArray(data["v_list"]).compactMap {
+            Self.userPlaylist($0, creatorKeys: ["nickname", "nick"])
+        }
+    }
+
+    func favoriteAlbums(limit: Int = 200) async throws -> [QQSearchAlbum] {
+        let credential = try requireCredential()
+        guard !credential.encryptUIN.isEmpty else { return [] }
+        let data = try await authenticatedCall(
+            module: "music.musicasset.AlbumFavRead",
+            method: "CgiGetAlbumFavInfo",
+            parameter: [
+                "euin": credential.encryptUIN,
+                "offset": 0,
+                "size": limit,
+            ]
+        )
+        return Self.dictionaryArray(data["v_list"]).compactMap {
+            Self.favoriteAlbum($0)
+        }
+    }
+
+    func followedArtists(limit: Int = 100) async throws -> [QQSearchArtist] {
+        let credential = try requireCredential()
+        guard !credential.encryptUIN.isEmpty else { return [] }
+        let data = try await authenticatedCall(
+            module: "music.concern.RelationList",
+            method: "GetFollowSingerList",
+            parameter: [
+                "HostUin": credential.encryptUIN,
+                "From": 0,
+                "Size": limit,
+            ]
+        )
+        return Self.dictionaryArray(data["List"]).compactMap { item in
+            guard let mid = Self.string(item["MID"]),
+                  let name = Self.string(item["Name"]) else {
+                return nil
+            }
+            return QQSearchArtist(
+                id: Self.int(item["SingerID"])
+                    ?? QQMusicSearchParser.stableID(mid),
+                mid: mid,
+                name: name,
+                avatarURL: Self.string(item["AvatarUrl"]),
+                isFollowed: true
+            )
+        }
+    }
+
+    // MARK: - Library writes
+
+    func setSongLiked(songID: Int, isLiked: Bool) async throws {
+        try await mutatePlaylistSongs(
+            dirid: Self.likedSongsDirid,
+            songID: songID,
+            adding: isLiked
+        )
+    }
+
+    func addSong(
+        songID: Int,
+        to dirid: Int,
+        tid: Int = 0
+    ) async throws {
+        try await mutatePlaylistSongs(
+            dirid: dirid,
+            tid: tid,
+            songID: songID,
+            adding: true
+        )
+    }
+
+    func removeSong(
+        songID: Int,
+        from dirid: Int,
+        tid: Int = 0
+    ) async throws {
+        try await mutatePlaylistSongs(
+            dirid: dirid,
+            tid: tid,
+            songID: songID,
+            adding: false
+        )
+    }
+
+    func createPlaylist(name: String) async throws -> QQSearchPlaylist {
+        _ = try requireCredential()
+        let data = try await authenticatedCall(
+            module: "music.musicasset.PlaylistBaseWrite",
+            method: "AddPlaylist",
+            parameter: ["dirName": name]
+        )
+        try Self.ensureSuccess(data)
+        let result = Self.dictionary(data["result"]) ?? [:]
+        let id = Self.int(result["tid"]) ?? 0
+        let dirid = Self.int(result["dirId"]) ?? 0
+        guard id > 0 || dirid > 0 else {
+            throw QQMusicError.invalidResponse
+        }
+        return QQSearchPlaylist(
+            id: id > 0 ? id : dirid,
+            dirid: dirid,
+            name: Self.string(result["dirName"]) ?? name,
+            coverURL: nil,
+            trackCount: 0,
+            playCount: 0,
+            creatorName: nil
+        )
+    }
+
+    func deletePlaylist(dirid: Int) async throws {
+        _ = try requireCredential()
+        let data = try await authenticatedCall(
+            module: "music.musicasset.PlaylistBaseWrite",
+            method: "DelPlaylist",
+            parameter: ["dirId": dirid]
+        )
+        try Self.ensureSuccess(data)
+    }
+
+    func setPlaylistSubscribed(id: Int, isSubscribed: Bool) async throws {
+        let credential = try requireCredential()
+        guard !credential.encryptUIN.isEmpty else {
+            throw QQMusicError.notLoggedIn
+        }
+        let data = try await authenticatedCall(
+            module: "music.musicasset.PlaylistFavWrite",
+            method: isSubscribed ? "FavPlaylist" : "CancelFavPlaylist",
+            parameter: [
+                "uin": credential.encryptUIN,
+                "v_playlistId": [id],
+            ]
+        )
+        let failed = (data["v_failedPlaylistId"] as? [Any])?
+            .compactMap { Self.int($0) } ?? []
+        guard Self.int(data["result"]) == 0, !failed.contains(id) else {
+            throw QQMusicError.server(
+                code: Self.int(data["result"]) ?? -1,
+                message: nil
+            )
+        }
+    }
+
+    func setAlbumSubscribed(id: Int, isSubscribed: Bool) async throws {
+        _ = try requireCredential()
+        let data = try await authenticatedCall(
+            module: "music.musicasset.AlbumFavWrite",
+            method: isSubscribed ? "FavAlbum" : "CancelFavAlbum",
+            parameter: ["v_albumId": [id]]
+        )
+        let failed = (data["v_failedAlbumId"] as? [Any])?
+            .compactMap { Self.int($0) } ?? []
+        guard Self.int(data["result"]) == 0, !failed.contains(id) else {
+            throw QQMusicError.server(
+                code: Self.int(data["result"]) ?? -1,
+                message: nil
+            )
+        }
+    }
+
+    private func mutatePlaylistSongs(
+        dirid: Int,
+        tid: Int = 0,
+        songID: Int,
+        adding: Bool
+    ) async throws {
+        _ = try requireCredential()
+        let data = try await authenticatedCall(
+            module: "music.musicasset.PlaylistDetailWrite",
+            method: adding ? "AddSonglist" : "DelSonglist",
+            parameter: [
+                "dirId": dirid,
+                "tid": tid,
+                "bFmtUtf8": true,
+                "v_songInfo": [
+                    ["songId": songID, "songType": 0],
+                ],
+            ]
+        )
+        try Self.ensureSuccess(data)
+    }
+
+    private func authenticatedCall(
+        module: String,
+        method: String,
+        parameter: [String: Any]
+    ) async throws -> [String: Any] {
+        try await cgiCall(
+            module: module,
+            method: method,
+            parameter: parameter,
+            session: nil
+        )
+    }
+
+    private func requireCredential() throws -> QQCredential {
+        guard let credential, credential.isValid else {
+            throw QQMusicError.notLoggedIn
+        }
+        return credential
+    }
+
+    private static func ensureSuccess(_ data: [String: Any]) throws {
+        if let result = int(data["result"]), result != 0 {
+            throw QQMusicError.server(code: result, message: nil)
+        }
+        if let retCode = int(data["retCode"]), retCode != 0 {
+            throw QQMusicError.server(code: retCode, message: nil)
+        }
+    }
+
+    private static func userPlaylist(
+        _ item: [String: Any],
+        creatorKeys: [String] = ["nick"]
+    ) -> QQSearchPlaylist? {
+        let id = int(item["dissid"]) ?? int(item["tid"])
+            ?? int(item["id"]) ?? 0
+        let name = string(item["title"]) ?? string(item["dissname"])
+            ?? string(item["name"]) ?? string(item["dirName"])
+        guard id > 0, let name, !name.isEmpty else { return nil }
+        let creator = creatorKeys.compactMap { string(item[$0]) }.first
+        return QQSearchPlaylist(
+            id: id,
+            dirid: int(item["dirid"]) ?? int(item["dirId"]) ?? 0,
+            name: name,
+            coverURL: string(item["picurl"])
+                ?? string(item["bigpicUrl"])
+                ?? string(item["cover"])
+                ?? string(item["logo"]),
+            trackCount: int(item["songnum"])
+                ?? int(item["songNum"])
+                ?? int(item["song_cnt"])
+                ?? 0,
+            playCount: int(item["listennum"])
+                ?? int(item["playCnt"])
+                ?? 0,
+            creatorName: creator
+        )
+    }
+
+    private static func favoriteAlbum(
+        _ item: [String: Any]
+    ) -> QQSearchAlbum? {
+        var normalized = item
+        if let singers = item["v_singer"] as? [[String: Any]] {
+            normalized["singers"] = singers
+        }
+        return QQMusicSearchParser.album(normalized)
+    }
+
     private func artistDescription(
         mid: String,
         session: (uid: String, sid: String)
@@ -576,7 +929,7 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
         module: String,
         method: String,
         parameter: [String: Any],
-        session: (uid: String, sid: String)
+        session: (uid: String, sid: String)? = nil
     ) async throws -> [String: Any] {
         let payload: [String: Any] = [
             "comm": buildComm(session: session),

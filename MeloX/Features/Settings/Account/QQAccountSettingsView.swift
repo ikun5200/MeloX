@@ -3,6 +3,7 @@ import SwiftUI
 struct QQAccountSettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(NeteaseAPI.self) private var api
+    @Environment(LibraryStore.self) private var library
 
     @State private var showsLogin = false
 
@@ -33,8 +34,8 @@ struct QQAccountSettingsView: View {
                     }
 
                     Button("ui.qq_account.logout", role: .destructive) {
-                        settings.clearQQCredential()
-                        api.updateQQCredential(.empty)
+                        api.clearAccount()
+                        library.clearAccountData()
                     }
                 } else {
                     Button("ui.qq_account.login") {
