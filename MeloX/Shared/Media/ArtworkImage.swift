@@ -6,6 +6,10 @@ struct ArtworkImage: View {
     let url: URL?
     var cornerRadius: CGFloat = 10
     var aspectRatio: CGFloat = 1
+    /// The scale applied by an enclosing `scaleEffect`. The corner radius
+    /// is compensated for it so the visible radius stays constant while
+    /// the artwork animates between the player and lyrics frames.
+    var enclosingScale: CGFloat = 1
 
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
@@ -24,7 +28,12 @@ struct ArtworkImage: View {
             .onDisappear(.lowerPriority)
         }
         .aspectRatio(aspectRatio, contentMode: .fit)
-        .clipShape(.rect(cornerRadius: cornerRadius))
+        .clipShape(
+            VisualRadiusRoundedRectangle(
+                scale: enclosingScale,
+                visualRadius: cornerRadius
+            )
+        )
         .accessibilityHidden(true)
     }
 
@@ -70,5 +79,28 @@ struct ArtworkImage: View {
                 .font(.title2)
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+/// A rounded rectangle whose radius is compensated for an enclosing
+/// `scaleEffect`, keeping the visible corner radius constant while the
+/// scale animates. `scale` must be the same value that drives that
+/// transform so both interpolate on the same curve.
+struct VisualRadiusRoundedRectangle: Shape {
+    var scale: CGFloat
+    var visualRadius: CGFloat
+    var style: RoundedCornerStyle = .continuous
+
+    var animatableData: CGFloat {
+        get { scale }
+        set { scale = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        RoundedRectangle(
+            cornerRadius: visualRadius / max(scale, 0.001),
+            style: style
+        )
+        .path(in: rect)
     }
 }

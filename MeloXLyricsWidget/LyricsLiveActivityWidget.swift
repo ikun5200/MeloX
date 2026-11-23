@@ -58,14 +58,14 @@ struct LyricsLiveActivityWidget: Widget {
                 }
             } compactLeading: {
                 compactLeadingContent(context.state)
-                    .widgetURL(Self.nowPlayingURL)
             } compactTrailing: {
                 compactTrailingContent(context.state)
-                    .widgetURL(Self.nowPlayingURL)
             } minimal: {
                 artwork(context.state, size: 24)
-                    .widgetURL(Self.nowPlayingURL)
             }
+            // Only a URL on the DynamicIsland itself is honored for
+            // compact/minimal taps; per-view URLs inside those regions
+            // are ignored.
             .widgetURL(Self.nowPlayingURL)
             .keylineTint(.red)
         }

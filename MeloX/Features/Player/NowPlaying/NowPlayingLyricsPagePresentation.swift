@@ -9,32 +9,30 @@ private struct NowPlayingLyricsPagePresentationModifier: ViewModifier {
     let reducesMotion: Bool
 
     func body(content: Content) -> some View {
-        TimelineView(
-            .animation(
-                paused:
-                    reducesMotion
-                    || !opacityTransition.isAnimating
-                        && !spatialTransition.isAnimating
-            )
-        ) { _ in
-            let now = ContinuousClock.now
-            let opacityProgress = reducesMotion
-                ? opacityTransition.targetProgress
-                : opacityTransition.progress(at: now)
-            let spatialProgress = reducesMotion
-                ? spatialTransition.targetProgress
-                : spatialTransition.presentation(at: now).progress
-            let scale = presentationScale
-                + (1 - presentationScale) * CGFloat(spatialProgress)
+        let opacityProgress = opacityTransition.targetProgress
+        let spatialProgress = spatialTransition.targetProgress
+        let scale = presentationScale
+            + (1 - presentationScale) * CGFloat(spatialProgress)
 
-            content
-                .offset(y: visualState.offsetY)
-                .scaleEffect(scale)
-                .blur(radius: visualState.blurRadius)
-                .opacity(
-                    opacitySpec.transformedProgress(opacityProgress)
-                )
-        }
+        content
+            .offset(y: visualState.offsetY)
+            .scaleEffect(scale)
+            .opacity(
+                opacitySpec.transformedProgress(opacityProgress)
+            )
+            .animation(
+                reducesMotion ? nil : spatialAnimation,
+                value: spatialTransition.targetProgress
+            )
+    }
+
+    private var spatialAnimation: Animation {
+        .interpolatingSpring(
+            mass: spatialTransition.spring.mass,
+            stiffness: spatialTransition.spring.stiffness,
+            damping: spatialTransition.spring.damping,
+            initialVelocity: spatialTransition.initialVelocity
+        )
     }
 }
 

@@ -11,22 +11,31 @@ struct NowPlayingPortraitArtwork: View {
 
     let song: Song
     let isArtworkPage: Bool
+    /// The scale applied by the enclosing page transition. The artwork's
+    /// corner clip uses this to keep a constant 12pt visible radius.
+    var enclosingScale: CGFloat = 1
 
     @State private var bounceScale: CGFloat = 1
 
     var body: some View {
         ArtworkImage(
             url: song.album?.artworkURL,
-            cornerRadius: 12
+            cornerRadius: 12,
+            enclosingScale: enclosingScale
         )
         .background {
-            // A static blurred shape scales with the artwork, so the
-            // compositor can reuse it instead of re-rendering a dynamic
-            // shadow on every frame of the lyrics transition.
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.black.opacity(shadowOpacity))
-                .blur(radius: 26)
-                .offset(y: 15)
+            if isArtworkPage {
+                // Fixed radius and fixed blur: the blurred texture is
+                // built once and only transformed during the transition.
+                // Play/pause intensity changes animate opacity instead of
+                // invalidating the blur.
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.black.opacity(0.34))
+                    .blur(radius: 26)
+                    .offset(y: 15)
+                    .opacity(player.isPlaying ? 1 : 0.53)
+                    .transition(.opacity)
+            }
         }
         .scaleEffect(bounceScale)
         .animation(
@@ -40,11 +49,6 @@ struct NowPlayingPortraitArtwork: View {
         .task(id: player.isPlaying) {
             await animateBounce()
         }
-    }
-
-    private var shadowOpacity: Double {
-        guard isArtworkPage else { return 0 }
-        return player.isPlaying ? 0.34 : 0.18
     }
 
     private func animateBounce() async {

@@ -15,7 +15,7 @@ final class AppSettings {
     static let defaultAlwaysMixesWithOtherApps = false
     static let defaultStartsHeartModeOnLaunch = false
     static let defaultRecognizesClipboardLinksOnLaunch = false
-    static let defaultSystemNowPlayingLyricsEnabled = true
+    static let defaultSystemNowPlayingLyricsEnabled = false
     static var defaultSystemNowPlayingLyricsTitleFormat: String {
         L10n.string("ui.lyrics.format.token.lyrics")
     }
@@ -26,7 +26,7 @@ final class AppSettings {
             L10n.string("ui.lyrics.format.token.artist")
         )
     }
-    static let defaultLyricsLiveActivityEnabled = false
+    static let defaultLyricsLiveActivityEnabled = true
     static var defaultLyricsLiveActivityTitleFormat: String {
         L10n.string("ui.lyrics.format.token.lyrics")
     }

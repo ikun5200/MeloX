@@ -542,7 +542,8 @@ struct NowPlayingView: View {
 
                     NowPlayingPortraitArtwork(
                         song: song,
-                        isArtworkPage: page == .artwork
+                        isArtworkPage: page == .artwork,
+                        enclosingScale: artworkScale
                     )
                     .frame(
                         width: artworkPageFrame.width,

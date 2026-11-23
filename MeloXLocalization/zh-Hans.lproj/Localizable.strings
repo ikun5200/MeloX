@@ -477,12 +477,12 @@
 "ui.settings.notification_status.provisional" = "临时允许";
 "ui.settings.notification_status.ephemeral" = "本次允许";
 
-"ui.settings.live_activity.enabled_experimental" = "实时活动歌词（实验性）";
+"ui.settings.live_activity.enabled_experimental" = "实时活动歌词";
 "ui.settings.live_activity.settings" = "实时活动显示设置";
 "ui.settings.live_activity.section" = "实时活动";
-"ui.settings.live_activity.warning.title" = "实验性功能，当前版本仍不稳定";
-"ui.settings.live_activity.warning.footer" = "可能出现歌词更新延迟、显示异常，或被系统提前结束。";
-"ui.settings.live_activity.warning.system_footer" = "可能出现歌词更新延迟、显示异常，或被系统提前结束；它与系统播放信息可以独立开启。";
+"ui.settings.live_activity.warning.title" = "实时活动显示说明";
+"ui.settings.live_activity.warning.footer" = "歌词更新可能有延迟，或被系统提前结束；点击灵动岛中的歌词实时活动可打开播放页。";
+"ui.settings.live_activity.warning.system_footer" = "歌词更新可能有延迟，或被系统提前结束；实时活动与系统播放信息可以独立开启。";
 "ui.settings.live_activity.status.section" = "功能状态";
 "ui.settings.live_activity.compact_format" = "缩起歌词格式";
 "ui.settings.live_activity.format.footer" = "可使用 {歌词}、{歌名}、{作者} 占位符；留空时会自动回退。";

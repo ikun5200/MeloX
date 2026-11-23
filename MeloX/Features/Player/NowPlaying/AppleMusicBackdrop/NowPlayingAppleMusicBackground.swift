@@ -108,7 +108,7 @@ struct NowPlayingAppleMusicBackground: View {
         }
         .onChange(of: isBehindLyrics) { _, newValue in
             withAnimation(
-                accessibilityReduceMotion
+                accessibilityReduceMotion || isTransitioning
                     ? nil
                     : .timingCurve(
                         0.42,
@@ -162,6 +162,7 @@ struct NowPlayingAppleMusicBackground: View {
             || isLuminanceReduced
             || scenePhase != .active
             || !player.isPlaying
+            || isTransitioning
     }
 
     private var backdropRefreshInterval: TimeInterval {

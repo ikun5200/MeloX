@@ -14,10 +14,10 @@ struct LyricsLiveActivitySettingsView: View {
             Section {
                 Label(
                     "ui.settings.live_activity.warning.title",
-                    systemImage: "exclamationmark.triangle.fill"
+                    systemImage: "info.circle.fill"
                 )
                 .font(.headline)
-                .foregroundStyle(.orange)
+                .foregroundStyle(.secondary)
 
                 Text("ui.settings.live_activity.warning.footer")
                     .font(.subheadline)

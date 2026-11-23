@@ -28,6 +28,12 @@ final class DeepLinkRouter {
         }
         nowPlayingRequestCount += 1
     }
+
+    /// The system uses this path when a Live Activity is tapped but does
+    /// not provide a URL.
+    func handleLiveActivityContinuation() {
+        nowPlayingRequestCount += 1
+    }
 }
 
 final class MeloXAppDelegate: NSObject, UIApplicationDelegate {

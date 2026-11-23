@@ -1,10 +1,38 @@
 import SwiftUI
 import UIKit
+import WidgetKit
 
 private enum ContentSheet: String, Identifiable {
     case settings
 
     var id: String { rawValue }
+}
+
+private struct DeepLinkRetryModifier: ViewModifier {
+    let router: DeepLinkRouter
+    let currentSongID: Int?
+    let presentedSheet: ContentSheet?
+    let releaseNotes: AppReleaseNotesStore
+    let onRequest: (Int) -> Void
+    let onRetry: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: router.nowPlayingRequestCount) {
+                _, count in
+                onRequest(count)
+            }
+            .onChange(of: currentSongID) { _, _ in
+                onRetry()
+            }
+            .onChange(of: presentedSheet) { _, _ in
+                onRetry()
+            }
+            .onChange(of: releaseNotes.releaseNotesToPresent) {
+                _, _ in
+                onRetry()
+            }
+    }
 }
 
 private struct HeartModeLaunchReadiness: Equatable {
@@ -23,6 +51,7 @@ struct ContentView: View {
     @Environment(LyricsStore.self) private var lyrics
     @Environment(FloatingLyricsController.self) private var floatingLyrics
     @Environment(NeteaseAPI.self) private var api
+    @Environment(AppReleaseNotesStore.self) private var releaseNotes
 
     @State private var selectedTab: AppTab
     @State private var navigationPaths = Dictionary(
@@ -65,6 +94,9 @@ struct ContentView: View {
             }
         }
         .onOpenURL(perform: handleOpenURL)
+        .onContinueUserActivity(NSUserActivityTypeLiveActivity) { _ in
+            deepLinkRouter.handleLiveActivityContinuation()
+        }
     }
 
     private var mainExperience: some View {
@@ -143,10 +175,6 @@ struct ContentView: View {
             }
             .task(id: api.accountScope) {
                 await library.refresh()
-            }
-            .onChange(of: deepLinkRouter.nowPlayingRequestCount) {
-                _, count in
-                handleNowPlayingDeepLinkRequest(count)
             }
             .background(alignment: .topLeading) {
                 FloatingLyricsPictureInPictureSource(
@@ -286,6 +314,16 @@ struct ContentView: View {
                         ?? L10n.string("ui.error.picture_in_picture.unavailable")
                 )
             }
+            .modifier(
+                DeepLinkRetryModifier(
+                    router: deepLinkRouter,
+                    currentSongID: player.currentSong?.id,
+                    presentedSheet: presentedSheet,
+                    releaseNotes: releaseNotes,
+                    onRequest: handleNowPlayingDeepLinkRequest,
+                    onRetry: presentPlayerFromDeepLinkIfPossible
+                )
+            )
             .coordinateListenTogether()
             .appLaunchExperience()
     }
@@ -488,11 +526,20 @@ struct ContentView: View {
 
     private func presentPlayerFromDeepLinkIfPossible() {
         guard pendingNowPlayingDeepLink, hasRestoredPlayback else { return }
-        // Presenting while the scene is still inactive can be dropped by
-        // SwiftUI; wait until the app is actually on screen.
-        guard scenePhase == .active else { return }
+        // Read the live application state instead of the scenePhase value
+        // captured when the view was created; a cold launch can finish
+        // restoring after the scene already became active.
+        guard UIApplication.shared.applicationState == .active else { return }
+        guard presentedSheet == nil,
+              releaseNotes.releaseNotesToPresent == nil else {
+            return
+        }
+        guard player.currentSong != nil else { return }
+        guard playerPresentation == nil else {
+            pendingNowPlayingDeepLink = false
+            return
+        }
         pendingNowPlayingDeepLink = false
-        guard player.currentSong != nil, playerPresentation == nil else { return }
         presentPlayer()
     }
 

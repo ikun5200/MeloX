@@ -477,12 +477,12 @@
 "ui.settings.notification_status.provisional" = "Provisionally Allowed";
 "ui.settings.notification_status.ephemeral" = "Allowed This Time";
 
-"ui.settings.live_activity.enabled_experimental" = "Live Activity Lyrics (Experimental)";
+"ui.settings.live_activity.enabled_experimental" = "Live Activity Lyrics";
 "ui.settings.live_activity.settings" = "Live Activity Display Settings";
 "ui.settings.live_activity.section" = "Live Activity";
-"ui.settings.live_activity.warning.title" = "Experimental Feature — Still Unstable";
-"ui.settings.live_activity.warning.footer" = "Lyrics may update late, display incorrectly, or be ended early by the system.";
-"ui.settings.live_activity.warning.system_footer" = "Lyrics may update late, display incorrectly, or be ended early by the system. This can be enabled independently from System Now Playing.";
+"ui.settings.live_activity.warning.title" = "About Live Activity Display";
+"ui.settings.live_activity.warning.footer" = "Lyrics may update late or be ended early by the system. Tap the lyrics Live Activity in the Dynamic Island to open the player.";
+"ui.settings.live_activity.warning.system_footer" = "Lyrics may update late or be ended early by the system. Live Activities and System Now Playing can be enabled independently.";
 "ui.settings.live_activity.status.section" = "Feature Status";
 "ui.settings.live_activity.compact_format" = "Compact Lyrics Format";
 "ui.settings.live_activity.format.footer" = "Use the {Lyrics}, {Title}, and {Artist} placeholders. Empty fields fall back automatically.";
