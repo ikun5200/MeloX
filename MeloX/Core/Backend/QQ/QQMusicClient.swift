@@ -714,6 +714,26 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
         }
     }
 
+    func loginUserInfo() async throws -> (
+        nickname: String?,
+        avatarURL: String?
+    ) {
+        _ = try requireCredential()
+        let data = try await authenticatedCall(
+            module: "music.UserInfo.userInfoServer",
+            method: "GetLoginUserInfo",
+            parameter: [:]
+        )
+        return (
+            Self.string(data["nick"])
+                ?? Self.string(data["nickname"])
+                ?? Self.string(data["name"]),
+            Self.string(data["headurl"])
+                ?? Self.string(data["headUrl"])
+                ?? Self.string(data["avatar"])
+        )
+    }
+
     // MARK: - Account library
 
     private static let likedSongsDirid = 201

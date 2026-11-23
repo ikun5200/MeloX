@@ -5,6 +5,15 @@ extension NeteaseAPI {
         seedSongID: Int,
         playlistID: Int
     ) async throws -> [Song] {
+        if isUsingSourceResolver {
+            let detail = try await qq.toplistDetail(
+                topID: 62,
+                limit: 30
+            )
+            return detail.songs
+                .filter { $0.id != seedSongID }
+                .map(QQMusicMapper.song)
+        }
         // Mirrors @neteaseapireborn/api/module/playmode_intelligence_list.js.
         let response: IntelligenceModeResponse = try await client.eapi(
             "/api/playmode/intelligence/list",

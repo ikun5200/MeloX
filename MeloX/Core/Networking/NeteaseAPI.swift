@@ -196,10 +196,21 @@ final class NeteaseAPI {
 
     func playlists(category: String, offset: Int = 0, limit: Int = 50) async throws -> [Playlist] {
         if isUsingSourceResolver {
-            if category == "排行榜" {
+            switch category {
+            case "排行榜":
                 return try await toplists()
+            case "推荐歌单":
+                return try await recommendedPlaylists(limit: limit)
+            default:
+                let result = try await qq.search(
+                    query: category,
+                    kind: .playlists,
+                    limit: limit
+                )
+                return result.playlists.map {
+                    QQMusicMapper.playlist($0)
+                }
             }
-            return try await recommendedPlaylists(limit: limit)
         }
         switch category {
         case "推荐歌单":
@@ -693,6 +704,13 @@ final class NeteaseAPI {
     }
 
     func dailySongs(afresh: Bool = false) async throws -> [Song] {
+        if isUsingSourceResolver {
+            let detail = try await qq.toplistDetail(
+                topID: 427,
+                limit: 30
+            )
+            return detail.songs.map(QQMusicMapper.song)
+        }
         let path = "/api/v3/discovery/recommend/songs"
         let data: [String: Any] = afresh ? ["afresh": true] : [:]
         let response: DailySongsResponse

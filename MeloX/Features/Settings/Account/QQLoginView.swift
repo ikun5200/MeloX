@@ -302,7 +302,20 @@ struct QQLoginView: View {
     private func completeLogin(_ credential: QQCredential) {
         settings.saveQQCredential(credential)
         api.updateQQCredential(credential)
-        Task { await library.refresh(force: true) }
+        Task {
+            if let profile = try? await api.qq.loginUserInfo() {
+                var updated = settings.qqCredential
+                if let nickname = profile.nickname, !nickname.isEmpty {
+                    updated.nickName = nickname
+                }
+                if let avatar = profile.avatarURL, !avatar.isEmpty {
+                    updated.avatarURL = avatar
+                }
+                settings.saveQQCredential(updated)
+                api.updateQQCredential(updated)
+            }
+            await library.refresh(force: true)
+        }
         dismiss()
     }
 }

@@ -24,6 +24,10 @@ final class PlaybackHistoryRecorder {
     }
 
     func recordRecentPlayback(song: Song, sourceID: Int?) {
+        if api.isUsingSourceResolver {
+            onRecorded(song)
+            return
+        }
         let resolvedSourceID = sourceID ?? song.album?.id ?? 0
         enqueue(song: song, operation: "recent") { api in
             try await api.recordRecentPlayback(
@@ -41,6 +45,7 @@ final class PlaybackHistoryRecorder {
         playbackTime: TimeInterval,
         completed: Bool
     ) {
+        if api.isUsingSourceResolver { return }
         let duration = max(song.durationMS / 1_000, 0)
         let elapsed = playbackTime.isFinite ? max(Int(playbackTime), 0) : 0
         let recordedTime = completed
