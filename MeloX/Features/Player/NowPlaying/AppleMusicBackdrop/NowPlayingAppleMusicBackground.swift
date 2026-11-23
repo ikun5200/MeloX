@@ -9,6 +9,8 @@ struct NowPlayingAppleMusicBackground: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.effectiveLyricsRefreshRate)
+    private var effectiveLyricsRefreshRate
 
     let artworkURL: URL?
     let isBehindLyrics: Bool
@@ -39,9 +41,7 @@ struct NowPlayingAppleMusicBackground: View {
             TimelineView(
                 .animation(
                     minimumInterval:
-                        isBehindLyrics
-                        ? 1.0 / 120.0
-                        : 1.0 / 60.0,
+                        effectiveLyricsRefreshRate.minimumInterval,
                     paused: pausesAnimation
                 )
             ) { context in

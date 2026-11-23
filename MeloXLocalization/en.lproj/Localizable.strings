@@ -690,7 +690,7 @@
 "ui.settings.lyrics.interaction.apple_music.footer" = "Controls hide automatically after inactivity. Browsing backward beyond the threshold also hides them; scrolling toward the current line reveals them immediately.";
 "ui.settings.lyrics.animation.refresh_rate" = "Word Highlight & Timeline Refresh Rate";
 "ui.settings.lyrics.animation.section.performance" = "Performance";
-"ui.settings.lyrics.animation.performance.footer" = "Controls frame updates for word highlighting, lyric focus, staggered movement, and instrumental indicators. Higher rates are smoother but consume more power. Low Power Mode and demanding Text PV styles automatically limit this to 30 FPS.";
+"ui.settings.lyrics.animation.performance.footer" = "Controls frame updates for word highlighting, lyric focus, staggered movement, and instrumental indicators. Automatic follows the display refresh rate (up to 120Hz with ProMotion). Higher rates are smoother but consume more power. Low Power Mode and demanding Text PV styles automatically limit this to 30 FPS.";
 "ui.settings.lyrics.animation.base_cascade_delay" = "Base Cascade Delay";
 "ui.settings.lyrics.animation.cascade_increment" = "Per-Line Cascade Increment";
 "ui.settings.lyrics.animation.following_delay" = "Following Lyrics Start Delay";
@@ -2234,3 +2234,4 @@
 "ui.service.qq_music" = "QQ Music";
 "ui.player.show_artwork_page" = "Show player page";
 "ui.legal.reference.qq_music_api" = "Reference for QQ Music APIs";
+"ui.settings.lyrics.animation.refresh_rate.automatic" = "Automatic (ProMotion)";

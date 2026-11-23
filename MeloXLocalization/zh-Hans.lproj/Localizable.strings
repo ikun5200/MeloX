@@ -690,7 +690,7 @@
 "ui.settings.lyrics.interaction.apple_music.footer" = "停止操作后控制栏会自动隐藏；向后浏览达到阈值时也会隐藏，往回滚动会立即重新显示。";
 "ui.settings.lyrics.animation.refresh_rate" = "逐字与时间轴刷新率";
 "ui.settings.lyrics.animation.section.performance" = "性能";
-"ui.settings.lyrics.animation.performance.footer" = "控制逐字高光、歌词焦点、错峰移动与演奏段指示器的逐帧更新。越高越流畅，也越耗电；低电量模式和高负载文字 PV 会自动限制为 30 FPS。";
+"ui.settings.lyrics.animation.performance.footer" = "控制逐字高光、歌词焦点、错峰移动与演奏段指示器的逐帧更新。自动会跟随屏幕刷新率（ProMotion 最高 120Hz）；越高越流畅，也越耗电；低电量模式和高负载文字 PV 会自动限制为 30 FPS。";
 "ui.settings.lyrics.animation.base_cascade_delay" = "基础拖尾延迟";
 "ui.settings.lyrics.animation.cascade_increment" = "逐句拖尾增量";
 "ui.settings.lyrics.animation.following_delay" = "后续歌词启动延迟";
@@ -2234,3 +2234,4 @@
 "ui.service.qq_music" = "QQ 音乐";
 "ui.player.show_artwork_page" = "显示播放页";
 "ui.legal.reference.qq_music_api" = "QQ 音乐接口参考";
+"ui.settings.lyrics.animation.refresh_rate.automatic" = "自动（ProMotion）";

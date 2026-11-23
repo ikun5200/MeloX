@@ -531,37 +531,29 @@ struct NowPlayingView: View {
         }
         .overlay {
             GeometryReader { _ in
-                if portraitArtworkFrame.width > 0 {
+                if artworkPageFrame.width > 0 {
                     let artworkReturnsToPlayer = page == .lyrics
+                    let artworkScale = artworkOverlayScale
+                    let artworkOffset = artworkOverlayOffset
+
                     NowPlayingPortraitArtwork(
                         song: song,
-                        isArtworkPage: page == .artwork
+                        isArtworkPage: page == .artwork,
+                        cornerRadius: 12 / max(artworkScale, 0.01)
                     )
                     .frame(
-                        width: portraitArtworkFrame.width,
-                        height: portraitArtworkFrame.height
+                        width: artworkPageFrame.width,
+                        height: artworkPageFrame.height
                     )
-                    .contentShape(.rect)
-                    .onTapGesture {
-                        guard artworkReturnsToPlayer else { return }
-                        pageSelection.wrappedValue = .artwork
-                    }
-                    .allowsHitTesting(artworkReturnsToPlayer)
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityAddTraits(
-                        artworkReturnsToPlayer ? .isButton : []
-                    )
-                    .accessibilityLabel(
-                        artworkReturnsToPlayer
-                            ? L10n.string("ui.player.show_artwork_page")
-                            : ""
-                    )
-                    .accessibilityHidden(!artworkReturnsToPlayer)
+                    .scaleEffect(artworkScale)
+                    .offset(artworkOffset)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
                     .position(
                         x:
-                            portraitArtworkFrame.midX
+                            artworkPageFrame.midX
                             + Self.portraitHorizontalPadding,
-                        y: portraitArtworkFrame.midY
+                        y: artworkPageFrame.midY
                     )
                     .animation(
                         accessibilityReduceMotion
@@ -582,6 +574,31 @@ struct NowPlayingView: View {
                             ),
                         value: page
                     )
+
+                    if artworkReturnsToPlayer {
+                        Color.clear
+                            .frame(
+                                width: NowPlayingSongHeader.referenceHeight,
+                                height: NowPlayingSongHeader.referenceHeight
+                            )
+                            .contentShape(.rect)
+                            .onTapGesture {
+                                pageSelection.wrappedValue = .artwork
+                            }
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityAddTraits(.isButton)
+                            .accessibilityLabel(
+                                L10n.string("ui.player.show_artwork_page")
+                            )
+                            .position(
+                                x:
+                                    NowPlayingSongHeader.referenceHeight / 2
+                                    + Self.portraitHorizontalPadding,
+                                y:
+                                    sharedPortraitSongHeaderOffset
+                                    + NowPlayingSongHeader.referenceHeight / 2
+                            )
+                    }
                 }
             }
             // Keep page-transition clipping vertically while allowing the
@@ -791,35 +808,36 @@ struct NowPlayingView: View {
         )
     }
 
-    private var portraitArtworkFrame: CGRect {
-        if page == .artwork {
-            return displayedArtworkPageFrame
-        }
+    private var artworkReturnScale: CGFloat {
+        guard artworkPageFrame.width > 0 else { return 1 }
+        return NowPlayingSongHeader.referenceHeight
+            / artworkPageFrame.width
+    }
 
-        return CGRect(
-            x: 0,
-            y: sharedPortraitSongHeaderOffset,
-            width: NowPlayingSongHeader.referenceHeight,
-            height: NowPlayingSongHeader.referenceHeight
+    private var artworkReturnOffset: CGSize {
+        guard artworkPageFrame.width > 0 else { return .zero }
+        let smallCenter = CGPoint(
+            x: NowPlayingSongHeader.referenceHeight / 2,
+            y: sharedPortraitSongHeaderOffset
+                + NowPlayingSongHeader.referenceHeight / 2
+        )
+        return CGSize(
+            width: smallCenter.x - artworkPageFrame.midX,
+            height: smallCenter.y - artworkPageFrame.midY
         )
     }
 
-    private var displayedArtworkPageFrame: CGRect {
-        guard !isPortraitArtworkExpanded else {
-            return artworkPageFrame
+    private var artworkOverlayScale: CGFloat {
+        if page == .artwork {
+            return isPortraitArtworkExpanded
+                ? 1
+                : NowPlayingArtworkPage.pausedArtworkScale
         }
-        let horizontalInset =
-            artworkPageFrame.width
-            * (1 - NowPlayingArtworkPage.pausedArtworkScale)
-            / 2
-        let verticalInset =
-            artworkPageFrame.height
-            * (1 - NowPlayingArtworkPage.pausedArtworkScale)
-            / 2
-        return artworkPageFrame.insetBy(
-            dx: horizontalInset,
-            dy: verticalInset
-        )
+        return artworkReturnScale
+    }
+
+    private var artworkOverlayOffset: CGSize {
+        page == .artwork ? .zero : artworkReturnOffset
     }
 
     private var isPortraitArtworkExpanded: Bool {

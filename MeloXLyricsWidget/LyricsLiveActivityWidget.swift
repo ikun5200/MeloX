@@ -3,17 +3,22 @@ import SwiftUI
 import WidgetKit
 
 struct LyricsLiveActivityWidget: Widget {
+    private static let nowPlayingURL =
+        URL(string: "melox://now-playing")!
+
     var body: some WidgetConfiguration {
         ActivityConfiguration(
             for: LyricsLiveActivityAttributes.self
         ) { context in
             lockScreenContent(context.state)
+                .widgetURL(Self.nowPlayingURL)
                 .activityBackgroundTint(.black.opacity(0.92))
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     artwork(context.state, size: 42)
+                        .widgetURL(Self.nowPlayingURL)
                 }
 
                 DynamicIslandExpandedRegion(.trailing) {
@@ -24,6 +29,7 @@ struct LyricsLiveActivityWidget: Widget {
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .widgetURL(Self.nowPlayingURL)
                 }
 
                 DynamicIslandExpandedRegion(
@@ -31,13 +37,17 @@ struct LyricsLiveActivityWidget: Widget {
                     priority: 1
                 ) {
                     expandedContent(context.state)
+                        .widgetURL(Self.nowPlayingURL)
                 }
             } compactLeading: {
                 compactLeadingContent(context.state)
+                    .widgetURL(Self.nowPlayingURL)
             } compactTrailing: {
                 compactTrailingContent(context.state)
+                    .widgetURL(Self.nowPlayingURL)
             } minimal: {
                 artwork(context.state, size: 24)
+                    .widgetURL(Self.nowPlayingURL)
             }
             .keylineTint(.red)
         }

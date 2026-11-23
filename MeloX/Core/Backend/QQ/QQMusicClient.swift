@@ -275,19 +275,30 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
             session: session
         )
         let info = Self.dictionary(infoData["Info"]) ?? [:]
-        let singer = Self.dictionary(info["Singer"])
-            ?? Self.dictionary(info["BaseInfo"])
-            ?? [:]
+        let baseInfo = Self.dictionary(info["BaseInfo"]) ?? [:]
+        let singer = Self.dictionary(info["Singer"]) ?? baseInfo
 
-        let artist = QQMusicSearchParser.artist(singer)
-            ?? QQSearchArtist(
-                id: Self.int(singer["SingerID"]) ?? 0,
-                mid: mid,
-                name: Self.string(singer["Name"]) ?? "",
-                avatarURL: Self.string(singer["Avatar"])
-                    ?? Self.string(singer["SingerPic"]),
-                isFollowed: false
+        // `Info.Singer.SingerPic` is often empty in the homepage response;
+        // the square avatar lives in `Info.BaseInfo.Avatar` / `BigAvatar`.
+        let avatarURL = Self.string(baseInfo["Avatar"])
+            ?? Self.string(baseInfo["BigAvatar"])
+            ?? Self.string(singer["SingerPic"])
+            ?? Self.string(singer["Avatar"])
+            ?? QQMusicSearchParser.singerCoverURL(
+                mid: Self.string(singer["SingerMid"]) ?? mid
             )
+
+        let artist = QQSearchArtist(
+            id: Self.int(singer["SingerID"])
+                ?? Self.int(baseInfo["SingerID"])
+                ?? 0,
+            mid: Self.string(singer["SingerMid"]) ?? mid,
+            name: Self.string(singer["Name"])
+                ?? Self.string(baseInfo["Name"])
+                ?? "",
+            avatarURL: avatarURL,
+            isFollowed: false
+        )
 
         let songsData = try await cgiCall(
             module: "musichall.song_list_server",

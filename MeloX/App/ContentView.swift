@@ -35,6 +35,7 @@ struct ContentView: View {
     @State private var pendingMusicRoute: MusicRoute?
     @State private var isTabViewBottomAccessorySuppressed = false
     @State private var hasRestoredPlayback = false
+    @State private var pendingNowPlayingDeepLink = false
     @State private var hasHandledHeartModeLaunch = false
     @State private var heartModeLaunchErrorMessage: String?
     @Namespace private var playerTransitionNamespace
@@ -61,6 +62,7 @@ struct ContentView: View {
                 OnboardingView()
             }
         }
+        .onOpenURL(perform: handleOpenURL)
     }
 
     private var mainExperience: some View {
@@ -114,6 +116,7 @@ struct ContentView: View {
                 await player.restore()
                 guard !Task.isCancelled else { return }
                 hasRestoredPlayback = true
+                presentPlayerFromDeepLinkIfPossible()
             }
             .task(
                 id: HeartModeLaunchReadiness(
@@ -460,6 +463,20 @@ struct ContentView: View {
                 }
                 .musicDestinations(in: musicNavigationNamespace)
         }
+    }
+
+    private func handleOpenURL(_ url: URL) {
+        guard url.scheme?.lowercased() == "melox",
+              url.host?.lowercased() == "now-playing" else { return }
+        pendingNowPlayingDeepLink = true
+        presentPlayerFromDeepLinkIfPossible()
+    }
+
+    private func presentPlayerFromDeepLinkIfPossible() {
+        guard pendingNowPlayingDeepLink, hasRestoredPlayback else { return }
+        pendingNowPlayingDeepLink = false
+        guard player.currentSong != nil, playerPresentation == nil else { return }
+        presentPlayer()
     }
 
     private func presentPlayer(page: NowPlayingPage? = nil) {
