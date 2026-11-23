@@ -104,6 +104,56 @@ struct Harness {
             QQMusicSearchParser.stableID64("1!abc*")
                 == QQMusicSearchParser.stableID64("1!abc*")
         )
+
+        let songItem: [String: Any] = [
+            "songid": 123,
+            "songmid": "mid123",
+            "songname": "<em>晴天</em>",
+            "singer": [
+                [
+                    "singerID": 7,
+                    "singerMid": "singer-mid",
+                    "singerName": "周杰伦",
+                ],
+            ],
+            "album": [
+                "id": 9,
+                "mid": "album-mid",
+                "name": "叶惠美",
+                "pic": "http://y.gtimg.cn/cover.jpg",
+            ],
+            "interval": 269,
+            "vid": "mv-vid",
+        ]
+        guard let parsedSong = QQMusicSearchParser.song(songItem) else {
+            preconditionFailure("song fixture should parse")
+        }
+        precondition(parsedSong.id == 123)
+        precondition(parsedSong.mid == "mid123")
+        precondition(parsedSong.name == "晴天")
+        precondition(parsedSong.albumID == 9)
+        precondition(parsedSong.albumMID == "album-mid")
+        precondition(parsedSong.durationSeconds == 269)
+        precondition(parsedSong.musicVideoMID == "mv-vid")
+        precondition(parsedSong.artists.first?.name == "周杰伦")
+
+        let playlistItem: [String: Any] = [
+            "dissid": 456,
+            "dirid": 789,
+            "dissname": "测试歌单",
+            "logo": "http://y.gtimg.cn/playlist.jpg",
+            "songnum": 12,
+            "listennum": 34,
+            "nickname": "创建者",
+        ]
+        guard let parsedPlaylist =
+            QQMusicSearchParser.playlist(playlistItem) else {
+            preconditionFailure("playlist fixture should parse")
+        }
+        precondition(parsedPlaylist.id == 456)
+        precondition(parsedPlaylist.dirid == 789)
+        precondition(parsedPlaylist.trackCount == 12)
+        precondition(parsedPlaylist.creatorName == "创建者")
     }
 }
 """
