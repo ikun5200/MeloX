@@ -1293,6 +1293,12 @@
 "ui.artist.loading" = "正在载入歌手";
 "ui.artist.play_popular_songs" = "播放热门歌曲";
 "ui.artist.popular_songs" = "热门歌曲";
+"ui.artist.description" = "歌手简介";
+"ui.artist.similar" = "相似歌手";
+"ui.mv.watch" = "观看 MV";
+"ui.mv.title" = "MV";
+"ui.mv.description" = "MV 简介";
+"ui.mv.play_failed" = "MV 播放失败";
 
 "ui.common.replace" = "替换";
 "ui.floating_lyrics.title" = "悬浮歌词";

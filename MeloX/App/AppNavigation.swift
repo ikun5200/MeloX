@@ -85,6 +85,12 @@ struct AlbumRouteContext: Hashable {
     }
 }
 
+struct MVRouteContext: Hashable {
+    let vid: String
+    let title: String
+    let artworkURLString: String?
+}
+
 enum MusicRoute: Hashable {
     case song(Song)
     case playlist(PlaylistRouteContext)
@@ -92,6 +98,7 @@ enum MusicRoute: Hashable {
     case playlistCategory(String)
     case album(AlbumRouteContext)
     case artist(Artist)
+    case mv(MVRouteContext)
     case dailySongs
     case newAlbums
     case toplists
@@ -110,7 +117,7 @@ enum MusicRoute: Hashable {
 
     var usesCardExpansionTransition: Bool {
         switch self {
-        case .song, .playlist, .toplist, .album, .artist:
+        case .song, .playlist, .toplist, .album, .artist, .mv:
             true
         case .playlistCategory,
              .dailySongs,
@@ -134,6 +141,8 @@ enum MusicRoute: Hashable {
             "album-\(context.id)"
         case .artist(let artist):
             "artist-\(artist.id)-\(artist.mid)"
+        case .mv(let context):
+            "mv-\(context.vid)"
         case .dailySongs:
             "daily-songs"
         case .newAlbums:
@@ -149,6 +158,8 @@ enum MusicRoute: Hashable {
             context.coverURLString.flatMap(URL.init(string:))
         case .album(let context):
             context.picURL.flatMap(URL.init(string:))
+        case .mv(let context):
+            context.artworkURLString.flatMap(URL.init(string:))
         case .song,
              .artist,
              .playlistCategory,
@@ -251,6 +262,8 @@ private struct MusicRouteDestination: View {
             AlbumDetailView(context: context)
         case .artist(let artist):
             ArtistDetailView(artist: artist)
+        case .mv(let context):
+            MVDetailView(context: context)
         case .dailySongs:
             DailySongsView()
         case .newAlbums:

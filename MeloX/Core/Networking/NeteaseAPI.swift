@@ -301,7 +301,7 @@ final class NeteaseAPI {
     func artist(
         id: Int,
         mid: String? = nil
-    ) async throws -> (Artist, [Song], [Album]) {
+    ) async throws -> (Artist, [Song], [Album], String?) {
         if resolver != nil {
             guard let mid, !mid.isEmpty else {
                 throw APIError.invalidResponse
@@ -314,7 +314,28 @@ final class NeteaseAPI {
             "/api/artist/albums/\(id)",
             data: ["limit": 100, "offset": 0, "total": true]
         )
-        return (detail.artist, detail.hotSongs, albums.hotAlbums)
+        return (detail.artist, detail.hotSongs, albums.hotAlbums, nil)
+    }
+
+    func similarArtists(
+        mid: String,
+        limit: Int = 10
+    ) async throws -> [Artist] {
+        guard isUsingSourceResolver, !mid.isEmpty else { return [] }
+        return try await qq.similarArtists(mid: mid, limit: limit)
+            .map(QQMusicMapper.artist)
+    }
+
+    func mvDetail(vid: String) async throws -> QQMVDetail? {
+        guard isUsingSourceResolver, !vid.isEmpty else { return nil }
+        return try await qq.mvDetail(vid: vid)
+    }
+
+    func mvPlayback(vid: String) async throws -> QQMVPlayback {
+        guard isUsingSourceResolver, !vid.isEmpty else {
+            throw APIError.invalidResponse
+        }
+        return try await qq.mvPlayback(vid: vid)
     }
 
     func songDetails(ids: [Int]) async throws -> [Song] {

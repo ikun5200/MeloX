@@ -1293,6 +1293,12 @@
 "ui.artist.loading" = "Loading Artist";
 "ui.artist.play_popular_songs" = "Play Popular Songs";
 "ui.artist.popular_songs" = "Popular Songs";
+"ui.artist.description" = "About";
+"ui.artist.similar" = "Similar Artists";
+"ui.mv.watch" = "Watch MV";
+"ui.mv.title" = "MV";
+"ui.mv.description" = "About This MV";
+"ui.mv.play_failed" = "Unable to Play MV";
 
 "ui.common.replace" = "Replace";
 "ui.floating_lyrics.title" = "Floating Lyrics";

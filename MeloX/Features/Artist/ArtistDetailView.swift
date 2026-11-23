@@ -12,9 +12,8 @@ struct ArtistDetailView: View {
     @Environment(LibraryStore.self) private var library
 
     @State private var artist: Artist?
-    @State private var isFollowed = false
-    @State private var isChangingFollowState = false
-    @State private var followError: String?
+    @State private var artistDescription: String?
+    @State private var similarArtists: [Artist] = []
     @State private var songs: [Song] = []
     @State private var albums: [Album] = []
     @State private var phase: LoadingPhase = .loading
@@ -35,12 +34,6 @@ struct ArtistDetailView: View {
                 }
             }
         }
-        .alert("ui.desktop.artist.follow_failed", isPresented: Binding(
-            get: { followError != nil },
-            set: { if !$0 { followError = nil } }
-        )) {
-            Button("ui.common.ok", role: .cancel) { followError = nil }
-        } message: { Text(followError ?? "") }
         .navigationTitle(artist?.name ?? L10n.string("ui.common.artist"))
         .navigationBarTitleDisplayMode(.inline)
         .task(id: reloadToken) {
@@ -74,18 +67,43 @@ struct ArtistDetailView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(songs.isEmpty)
-
-                    Button(
-                        isFollowed ? L10n.string("ui.desktop.artist.following") : L10n.string("ui.desktop.artist.follow"),
-                        systemImage: isFollowed ? "checkmark" : "plus"
-                    ) {
-                        Task { await toggleFollow(artist) }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(isChangingFollowState || !library.isLoggedIn)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
+            }
+
+            if let artistDescription, !artistDescription.isEmpty {
+                Section("ui.artist.description") {
+                    Text(artistDescription)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if !similarArtists.isEmpty {
+                Section("ui.artist.similar") {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 14) {
+                            ForEach(similarArtists) { similar in
+                                NavigationLink(value: MusicRoute.artist(similar)) {
+                                    VStack(spacing: 6) {
+                                        ArtworkImage(
+                                            url: similar.artworkURL,
+                                            cornerRadius: 1_000
+                                        )
+                                        .frame(width: 76, height: 76)
+                                        Text(similar.name)
+                                            .font(.caption)
+                                            .lineLimit(1)
+                                    }
+                                    .frame(width: 84)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
             }
 
             Section("ui.artist.popular_songs") {
@@ -136,29 +154,24 @@ struct ArtistDetailView: View {
         .listStyle(.insetGrouped)
     }
 
-    private func toggleFollow(_ artist: Artist) async {
-        guard !isChangingFollowState else { return }
-        let previous = isFollowed
-        isFollowed.toggle()
-        isChangingFollowState = true
-        defer { isChangingFollowState = false }
-        do {
-            try await library.setArtistFollowed(artist, isFollowed: isFollowed)
-        } catch {
-            isFollowed = previous
-            followError = error.localizedDescription
-        }
-    }
-
     private func load() async {
         phase = .loading
         do {
-            (artist, songs, albums) = try await api.artist(
+            let loaded = try await api.artist(
                 id: input.id,
                 mid: input.mid
             )
+            artist = loaded.0
+            songs = loaded.1
+            albums = loaded.2
+            artistDescription = loaded.3
             if let artist {
-                isFollowed = artist.isFollowed || library.contains(artist: artist)
+                similarArtists = (
+                    try? await api.similarArtists(
+                        mid: artist.mid,
+                        limit: 12
+                    )
+                ) ?? []
             }
             phase = .loaded
         } catch is CancellationError {

@@ -160,6 +160,20 @@ struct SongDetailView: View {
 
     private var informationSection: some View {
         Section("ui.song.information") {
+            if let vid = song.musicVideoMID, !vid.isEmpty {
+                NavigationLink(
+                    value: MusicRoute.mv(
+                        MVRouteContext(
+                            vid: vid,
+                            title: song.name,
+                            artworkURLString: song.album?.picURL
+                        )
+                    )
+                ) {
+                    Label("ui.mv.watch", systemImage: "play.rectangle")
+                }
+            }
+
             ForEach(song.artists) { artist in
                 NavigationLink(value: MusicRoute.artist(artist)) {
                     LabeledContent(L10n.string("ui.common.artist"), value: artist.name)

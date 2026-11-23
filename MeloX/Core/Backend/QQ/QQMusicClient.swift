@@ -263,7 +263,11 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
         songLimit: Int = 100,
         albumLimit: Int = 100
     ) async throws -> QQArtistDetail {
-        let session = try await anonymousSession()
+        var anonymous: (uid: String, sid: String)?
+        if credential?.isValid != true {
+            anonymous = try await anonymousSession()
+        }
+        let session = anonymous
         let infoData = try await cgiCall(
             module: "music.UnifiedHomepage.UnifiedHomepageSrv",
             method: "GetHomepageHeader",
@@ -330,6 +334,25 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
             description: description,
             songs: QQMusicSearchParser.songs(songInfos),
             albums: albums
+        )
+    }
+
+    func similarArtists(
+        mid: String,
+        limit: Int = 10
+    ) async throws -> [QQSearchArtist] {
+        let session = try await anonymousSession()
+        let data = try await cgiCall(
+            module: "music.SimilarSingerSvr",
+            method: "GetSimilarSingerList",
+            parameter: [
+                "singerMid": mid,
+                "number": min(max(limit, 1), 30),
+            ],
+            session: session
+        )
+        return QQMusicSearchParser.artists(
+            Self.dictionaryArray(data["singerlist"])
         )
     }
 
@@ -498,6 +521,106 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
             }
         }
         return songs
+    }
+
+    // MARK: - MV
+
+    func mvDetail(vid: String) async throws -> QQMVDetail? {
+        let session = try await anonymousSession()
+        let data = try await cgiCall(
+            module: "video.VideoDataServer",
+            method: "get_video_info_batch",
+            parameter: [
+                "vidlist": [vid],
+                "required": [
+                    "vid", "type", "sid", "cover_pic", "duration",
+                    "singers", "video_switch", "msg", "name", "desc",
+                    "playcnt", "pubdate", "isfav", "gmid",
+                    "uploader_headurl", "uploader_nick",
+                    "uploader_encuin", "uploader_uin",
+                    "uploader_hasfollow", "uploader_follower_num",
+                    "related_songs",
+                ],
+            ],
+            session: session
+        )
+        let item = Self.dictionary(data[vid])
+            ?? Self.dictionaryArray(data["vidlist"]).first
+            ?? [:]
+        guard !item.isEmpty else { return nil }
+        let singers = Self.dictionaryArray(item["singers"])
+        return QQMVDetail(
+            vid: Self.string(item["vid"]) ?? vid,
+            name: Self.string(item["name"]) ?? "",
+            coverURL: Self.string(item["cover_pic"]),
+            description: Self.string(item["desc"]),
+            duration: Self.int(item["duration"]) ?? 0,
+            playCount: Self.int(item["playcnt"]) ?? 0,
+            artists: QQMusicSearchParser.artists(singers),
+            publishDate: Self.int(item["pubdate"]) ?? 0
+        )
+    }
+
+    func mvPlayback(vid: String) async throws -> QQMVPlayback {
+        let session = try await anonymousSession()
+        let data = try await cgiCall(
+            module: "music.stream.MvUrlProxy",
+            method: "GetMvUrls",
+            parameter: [
+                "vids": [vid],
+                "request_type": 10_003,
+                "guid": guid,
+                "videoformat": 1,
+                "format": 265,
+                "dolby": 1,
+                "use_new_domain": 1,
+                "use_ipv6": 1,
+            ],
+            session: session
+        )
+        let entry = Self.dictionary(data[vid]) ?? [:]
+        var mp4URLs: [URL] = []
+        for item in Self.dictionaryArray(entry["mp4"]) {
+            for value in Self.urlStrings(item) {
+                guard let url = URL(string: value),
+                      url.path != "/",
+                      !url.path.isEmpty else {
+                    continue
+                }
+                mp4URLs.append(url)
+            }
+        }
+        mp4URLs.sort {
+            $0.scheme == "https" && $1.scheme != "https"
+        }
+        var hlsURL: URL?
+        for item in Self.dictionaryArray(entry["hls"]) {
+            if let value = Self.string(item["m3u8"]),
+               let url = URL(string: value) {
+                hlsURL = url
+                break
+            }
+            if let value = Self.urlStrings(item).first,
+               let url = URL(string: value),
+               url.path != "/",
+               !url.path.isEmpty {
+                hlsURL = url
+                break
+            }
+        }
+        return QQMVPlayback(mp4URLs: mp4URLs, hlsURL: hlsURL)
+    }
+
+    private static func urlStrings(_ item: [String: Any]) -> [String] {
+        var values: [String] = []
+        for key in ["freeflow_url", "comm_url", "url"] {
+            guard let list = item[key] as? [String] else { continue }
+            values.append(contentsOf: list.filter {
+                !$0.trimmingCharacters(in: .whitespaces).isEmpty
+                    && !$0.hasSuffix("//")
+            })
+        }
+        return values
     }
 
     // MARK: - Comments
@@ -885,7 +1008,7 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
 
     private func artistDescription(
         mid: String,
-        session: (uid: String, sid: String)
+        session: (uid: String, sid: String)?
     ) async -> String? {
         guard let data = try? await cgiCall(
             module: "music.musichallSinger.SingerInfoInter",

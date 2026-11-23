@@ -42,28 +42,6 @@ func filterLibraryPodcasts(
     }
 }
 
-func filterCloudSongs(
-    _ items: [CloudSong],
-    query: String
-) -> [CloudSong] {
-    let query = normalizedLibrarySearchQuery(query)
-    guard !query.isEmpty else { return items }
-
-    return items.filter { item in
-        librarySearchMatches(
-            query,
-            fields: [
-                item.songName,
-                item.artist,
-                item.album,
-                item.simpleSong.name,
-                item.simpleSong.artistText,
-                item.simpleSong.album?.name,
-            ]
-        )
-    }
-}
-
 func normalizedLibrarySearchQuery(_ query: String) -> String {
     query.trimmingCharacters(in: .whitespacesAndNewlines)
 }
