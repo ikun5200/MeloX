@@ -86,6 +86,9 @@ final class LyricsService {
             // Wait for every remaining source before re-running the normal
             // automatic quality ranking with the complete collection.
             if usesAMLL || usesQQMusic {
+                let qqMusicID = api.isUsingSourceResolver
+                    ? Int64(song.id)
+                    : nil
                 await withTaskGroup(of: FetchEvent?.self) { group in
                     if usesAMLL {
                         group.addTask {
@@ -97,7 +100,10 @@ final class LyricsService {
                     }
                     if usesQQMusic {
                         group.addTask {
-                            guard let payload = try? await qqMusicClient.lyrics(for: song) else {
+                            guard let payload = try? await qqMusicClient.lyrics(
+                                for: song,
+                                qqMusicID: qqMusicID
+                            ) else {
                                 return nil
                             }
                             return .qqMusic(payload)
@@ -118,6 +124,9 @@ final class LyricsService {
                 onUpdate: onUpdate
             )
         } else {
+            let qqMusicID = api.isUsingSourceResolver
+                ? Int64(song.id)
+                : nil
             await withTaskGroup(of: FetchEvent?.self) { group in
                 if usesNetease {
                     group.addTask {
@@ -137,7 +146,10 @@ final class LyricsService {
                 }
                 if usesQQMusic {
                     group.addTask {
-                        guard let payload = try? await qqMusicClient.lyrics(for: song) else {
+                        guard let payload = try? await qqMusicClient.lyrics(
+                            for: song,
+                            qqMusicID: qqMusicID
+                        ) else {
                             return nil
                         }
                         return .qqMusic(payload)

@@ -1989,9 +1989,11 @@ struct AppleMusicLyricsView: View {
     private func waitForPreparedFocus(
         id: LyricLine.ID,
         viewportAnchorY: CGFloat,
-        focusPosition: CGFloat
+        focusPosition: CGFloat,
+        attempts: Int = 30
     ) async -> Bool {
-        for attempt in 0..<30 {
+        guard attempts > 0 else { return false }
+        for attempt in 0..<attempts {
             if let frame = lyricGeometryCache.frames[id] {
                 let preparedAnchorY = frame.minY
                     + frame.height * focusPosition
@@ -1999,7 +2001,9 @@ struct AppleMusicLyricsView: View {
                     return true
                 }
             }
-            guard !Task.isCancelled, attempt < 29 else { return false }
+            guard !Task.isCancelled, attempt < attempts - 1 else {
+                return false
+            }
             do {
                 try await Task.sleep(for: .milliseconds(16))
             } catch {
@@ -2041,12 +2045,17 @@ struct AppleMusicLyricsView: View {
             )
             return
         }
-        let needsImmediateCatchUp = remainingFocusDuration(for: highlightedLyricID)
-            .map { $0 <= settings.lyricsFocusSnapThreshold } == true
+        let isManualSeekTransition =
+            seekFeedback?.lyricID == highlightedLyricID
+        let needsImmediateCatchUp =
+            !isManualSeekTransition
+            && remainingFocusDuration(for: highlightedLyricID)
+                .map { $0 <= settings.lyricsFocusSnapThreshold } == true
         let interruptedPreparation = lyricMovementTransition.map {
             $0.startedAt == nil && $0.focusID != highlightedLyricID
         } == true
-        if needsImmediateCatchUp || interruptedPreparation {
+        if !isManualSeekTransition,
+           needsImmediateCatchUp || interruptedPreparation {
             completeCascadeMovement(to: highlightedLyricID)
             return
         }
@@ -2064,8 +2073,6 @@ struct AppleMusicLyricsView: View {
         let movementFocusLyricID = lyricMovementTransition?.focusID
             ?? visualCascadeFocusLyricID
             ?? scrollPositionID
-        let isManualSeekTransition =
-            seekFeedback?.lyricID == highlightedLyricID
         // Apple's manual/forced (kind 1) caller supplies a zero curve input
         // and resolves to the fixed line-change spring.
         let timedWordTransitionSourceDuration = isManualSeekTransition
@@ -3626,7 +3633,11 @@ struct AppleMusicLyricsView: View {
             }
         }
 
-        for attempt in 0..<3 {
+        // A user-initiated scroll (lyric tap) must stay animated. The old
+        // 480 ms retry window often expired before the spring settled and
+        // then snapped to the target, which looked like an instant jump.
+        let attempts = animated ? 1 : 3
+        for attempt in 0..<attempts {
             guard !Task.isCancelled else { return }
 
             if scrollPositionID == id || attempt > 0 {
@@ -3643,7 +3654,8 @@ struct AppleMusicLyricsView: View {
             let isAligned = await waitForPreparedFocus(
                 id: id,
                 viewportAnchorY: viewportAnchorY,
-                focusPosition: focusPosition
+                focusPosition: focusPosition,
+                attempts: animated ? 120 : 30
             )
             if isAligned {
                 return

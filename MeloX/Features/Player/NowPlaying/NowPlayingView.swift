@@ -532,6 +532,7 @@ struct NowPlayingView: View {
         .overlay {
             GeometryReader { _ in
                 if portraitArtworkFrame.width > 0 {
+                    let artworkReturnsToPlayer = page == .lyrics
                     NowPlayingPortraitArtwork(
                         song: song,
                         isArtworkPage: page == .artwork
@@ -555,7 +556,24 @@ struct NowPlayingView: View {
                                 .animation,
                         value: isPortraitArtworkExpanded
                     )
-                    .allowsHitTesting(false)
+                    .contentShape(.rect)
+                    .onTapGesture {
+                        guard artworkReturnsToPlayer else { return }
+                        pageSelection.wrappedValue = .artwork
+                    }
+                    .allowsHitTesting(artworkReturnsToPlayer)
+                    .accessibilityElement(
+                        children: artworkReturnsToPlayer ? .ignore : .contain
+                    )
+                    .accessibilityAddTraits(
+                        artworkReturnsToPlayer ? .isButton : []
+                    )
+                    .accessibilityLabel(
+                        artworkReturnsToPlayer
+                            ? L10n.string("ui.player.show_artwork_page")
+                            : ""
+                    )
+                    .accessibilityHidden(!artworkReturnsToPlayer)
                 }
             }
             // Keep page-transition clipping vertically while allowing the

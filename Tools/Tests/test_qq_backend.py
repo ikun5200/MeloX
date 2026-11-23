@@ -15,6 +15,8 @@ SOURCES = [
     "MeloX/Core/Backend/QQ/QQMusicSign.swift",
     "MeloX/Core/Backend/QQ/QQMusicSearchModels.swift",
     "MeloX/Core/Links/QQMusicLink.swift",
+    "MeloX/Core/Lyrics/QQMusicLyricMatchStore.swift",
+    "MeloX/Core/Lyrics/QQMusicLyricMatcher.swift",
     "MeloX/Core/Settings/Playback/MusicQuality.swift",
     "MeloX/Core/Sources/LXQualityMapping.swift",
 ]
@@ -32,6 +34,14 @@ enum L10n {
 
 struct SongAudioAvailability {
     func supports(apiLevel: String) -> Bool? { true }
+}
+
+struct LyricsSongMetadata: Hashable, Sendable {
+    let id: Int
+    let title: String
+    let album: String
+    let artist: String
+    let durationSeconds: Int
 }
 """
 
@@ -91,6 +101,53 @@ struct Harness {
                 for: URL(string: "https://example.com/stream")!,
                 quality: "master"
             ) == "flac"
+        )
+
+        let lyricMetadata = LyricsSongMetadata(
+            id: 405007729,
+            title: "愿与愁",
+            album: "重拾_快乐",
+            artist: "林俊杰",
+            durationSeconds: 231
+        )
+        let lyricCandidate = QQMusicTrackMatch(
+            id: 405007729,
+            title: "愿与愁",
+            album: "重拾_快乐",
+            artist: "林俊杰",
+            durationSeconds: 0
+        )
+        precondition(
+            QQMusicLyricMatcher.bestCandidate(
+                in: [lyricCandidate],
+                for: lyricMetadata
+            )?.id == 405007729
+        )
+        let wrongDuration = QQMusicTrackMatch(
+            id: 1,
+            title: "愿与愁",
+            album: "重拾_快乐",
+            artist: "林俊杰",
+            durationSeconds: 300
+        )
+        precondition(
+            QQMusicLyricMatcher.bestCandidate(
+                in: [wrongDuration],
+                for: lyricMetadata
+            ) == nil
+        )
+        let wrongArtist = QQMusicTrackMatch(
+            id: 2,
+            title: "愿与愁",
+            album: "重拾_快乐",
+            artist: "其他歌手",
+            durationSeconds: 231
+        )
+        precondition(
+            QQMusicLyricMatcher.bestCandidate(
+                in: [wrongArtist],
+                for: lyricMetadata
+            ) == nil
         )
 
         precondition(

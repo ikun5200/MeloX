@@ -379,7 +379,7 @@ struct UserSummary: Codable, Hashable {
 
     init(
         userID: Int = 0,
-        nickname: String = L10n.string("ui.service.netease")
+        nickname: String = L10n.string("ui.service.qq_music")
     ) {
         self.userID = userID
         self.nickname = nickname
@@ -389,7 +389,7 @@ struct UserSummary: Codable, Hashable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         userID = try container.decodeIfPresent(Int.self, forKey: .userID) ?? 0
         nickname = try container.decodeIfPresent(String.self, forKey: .nickname)
-            ?? L10n.string("ui.service.netease")
+            ?? L10n.string("ui.service.qq_music")
     }
 }
 

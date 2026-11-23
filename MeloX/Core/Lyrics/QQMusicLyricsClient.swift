@@ -12,7 +12,31 @@ nonisolated struct QQMusicLyricsClient: Sendable {
         self.matchStore = matchStore
     }
 
-    func lyrics(for song: LyricsSongMetadata) async throws -> QQLyricPayload {
+    /// Resolves lyrics for `song`.
+    ///
+    /// When `qqMusicID` is provided the song already came from QQ Music, so
+    /// its song ID is authoritative and no text search is needed. Searching
+    /// was the main source of missing lyrics: the search index can return a
+    /// different version, an empty result under load, or a track whose
+    /// duration differs by more than the matcher allows. Falling back to the
+    /// search path keeps NetEase-origin songs (and legacy data) working.
+    func lyrics(
+        for song: LyricsSongMetadata,
+        qqMusicID: Int64? = nil
+    ) async throws -> QQLyricPayload {
+        if let qqMusicID, qqMusicID > 0 {
+            let direct = QQMusicTrackMatch(
+                id: qqMusicID,
+                title: song.title,
+                album: song.album,
+                artist: song.artist,
+                durationSeconds: song.durationSeconds
+            )
+            if let payload = try? await payload(for: direct) {
+                return payload
+            }
+        }
+
         let match: QQMusicTrackMatch
         if let stored = await matchStore.match(for: song.id),
            QQMusicLyricMatcher.isPlausible(stored, for: song) {
@@ -26,6 +50,12 @@ nonisolated struct QQMusicLyricsClient: Sendable {
             await matchStore.set(searched, for: song.id)
         }
 
+        return try await payload(for: match)
+    }
+
+    private func payload(
+        for match: QQMusicTrackMatch
+    ) async throws -> QQLyricPayload {
         let primary = try await lyricResponse(for: match, requestsQRC: true)
         let verbatim = primary.qrcT != 0
             ? QQMusicLyricDecoder.decode(primary.lyric)
@@ -61,7 +91,14 @@ nonisolated struct QQMusicLyricsClient: Sendable {
         for song: LyricsSongMetadata
     ) async throws -> QQMusicTrackMatch? {
         for query in QQMusicLyricMatcher.searchQueries(for: song) {
-            let candidates = try await search(query: query)
+            // QQ's search CGI intermittently answers `code: 2001` (no data)
+            // for a perfectly valid query, especially when many lyric
+            // requests are in flight. A failed query must not abort the
+            // remaining, simpler queries.
+            guard let candidates = try? await search(query: query),
+                  !candidates.isEmpty else {
+                continue
+            }
             if let match = QQMusicLyricMatcher.bestCandidate(
                 in: candidates,
                 for: song

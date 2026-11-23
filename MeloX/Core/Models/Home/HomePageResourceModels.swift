@@ -19,7 +19,7 @@ struct HomePageResource: Codable, Identifiable {
         uiElement?.mainTitle?.nonemptyTitle
             ?? extensionInfo?.song?.name
             ?? extensionInfo?.podcastProgram?.name
-            ?? L10n.string("ui.common.netease_cloud_music")
+            ?? L10n.string("ui.common.qq_music")
     }
 
     var subtitle: String? {

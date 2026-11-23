@@ -23,6 +23,7 @@ struct PlaylistDetailContent: View {
     var highlightedSongID: Int?
 
     @Environment(LibraryStore.self) private var library
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     private var usesToplistLayout: Bool {
         toplistSummary != nil || playlist.isOfficialToplist
     }
@@ -51,7 +52,7 @@ struct PlaylistDetailContent: View {
                 StandardMusicCollectionDetailHero(
                     artworkURL: playlist.artworkURL,
                     title: playlist.name,
-                    subtitle: playlist.creator?.nickname ?? L10n.string("ui.service.netease_cloud_music"),
+                    subtitle: playlist.creator?.nickname ?? L10n.string("ui.service.qq_music"),
                     metadataText: standardMetadata,
                     descriptionText: playlist.nonemptyDescription,
                     tracks: playlist.tracks,
@@ -287,6 +288,12 @@ private struct ToplistDetailHero: View {
                         endPoint: .bottom
                     )
                     .frame(height: 126)
+                    .animation(
+                        accessibilityReduceMotion
+                            ? nil
+                            : .easeInOut(duration: 0.35),
+                        value: palette
+                    )
                 }
 
             Text(playlist.name)
@@ -332,7 +339,7 @@ private struct ToplistDetailHero: View {
     private var creatorName: String {
         playlist.creator?.nickname
             ?? summary?.creator?.nickname
-            ?? L10n.string("ui.service.netease_cloud_music")
+            ?? L10n.string("ui.service.qq_music")
     }
 
     private var updateText: String? {
@@ -482,6 +489,8 @@ struct MusicCollectionArtworkBackdrop: View {
     let blurredArtworkImage: CGImage?
     let palette: ArtworkDetailPalette
 
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+
     var body: some View {
         GeometryReader { proxy in
             ZStack {
@@ -505,6 +514,12 @@ struct MusicCollectionArtworkBackdrop: View {
             .frame(width: proxy.size.width, height: proxy.size.height)
             .clipped()
         }
+        .animation(
+            accessibilityReduceMotion
+                ? nil
+                : .easeInOut(duration: 0.35),
+            value: palette
+        )
         .ignoresSafeArea()
         .accessibilityHidden(true)
     }

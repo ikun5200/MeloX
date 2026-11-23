@@ -68,10 +68,14 @@ nonisolated enum QQMusicLyricMatcher {
         _ candidate: QQMusicTrackMatch,
         for song: LyricsSongMetadata
     ) -> MatchConfidence? {
+        let hasKnownDuration = song.durationSeconds > 0
+            && candidate.durationSeconds > 0
         let durationDelta = abs(
             candidate.durationSeconds - song.durationSeconds
         )
-        guard durationDelta <= acceptedDurationDelta else { return nil }
+        if hasKnownDuration {
+            guard durationDelta <= acceptedDurationDelta else { return nil }
+        }
 
         let titleScore = titleSimilarity(candidate.title, song: song)
         guard titleScore >= 0.75 else { return nil }
@@ -84,11 +88,17 @@ nonisolated enum QQMusicLyricMatcher {
         }
 
         let durationScore: Double
-        switch durationDelta {
-        case 0: durationScore = 1
-        case ...2: durationScore = 0.85
-        case ...5: durationScore = 0.7
-        default: durationScore = 0.5
+        if !hasKnownDuration {
+            // Some QQ endpoints omit the track length. Duration must not
+            // disqualify an otherwise exact title/artist match.
+            durationScore = 0.6
+        } else {
+            switch durationDelta {
+            case 0: durationScore = 1
+            case ...2: durationScore = 0.85
+            case ...5: durationScore = 0.7
+            default: durationScore = 0.5
+            }
         }
 
         let albumScore = albumSimilarity(candidate.album, song: song)

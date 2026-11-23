@@ -34,16 +34,6 @@ struct ProjectLicensesView: View {
                     document: .melox
                 )
                 licenseLink(
-                    title: "YesPlayMusic",
-                    license: L10n.string("ui.legal.license.mit"),
-                    document: .yesPlayMusic
-                )
-                licenseLink(
-                    title: L10n.string("ui.legal.netease_audio_fingerprint"),
-                    license: L10n.string("ui.legal.license.mit"),
-                    document: .neteaseAPI
-                )
-                licenseLink(
                     title: "PV Tool",
                     license: L10n.string("ui.legal.license.noncommercial"),
                     document: .pvTool
@@ -72,14 +62,9 @@ struct ProjectLicensesView: View {
                     url: URL(string: "https://github.com/WXRIW/Lyricify-Lyrics-Helper")!
                 )
                 projectLink(
-                    name: "qier222/YesPlayMusic",
-                    contribution: L10n.string("ui.legal.reference.yesplaymusic"),
-                    url: URL(string: "https://github.com/qier222/YesPlayMusic")!
-                )
-                projectLink(
-                    name: "neteasecloudmusicapienhanced/api-enhanced",
-                    contribution: L10n.string("ui.legal.reference.netease_api"),
-                    url: URL(string: "https://github.com/neteasecloudmusicapienhanced/api-enhanced")!
+                    name: "L-1124/QQMusicApi",
+                    contribution: L10n.string("ui.legal.reference.qq_music_api"),
+                    url: URL(string: "https://github.com/L-1124/QQMusicApi")!
                 )
                 projectLink(
                     name: "DanteAlighieri13210914/pv-tool",
@@ -152,8 +137,6 @@ struct ProjectLicensesView: View {
 
 enum LegalDocument: String, Identifiable {
     case melox
-    case yesPlayMusic
-    case neteaseAPI
     case pvTool
     case sourceHanSerif
     case beatNet
@@ -163,8 +146,6 @@ enum LegalDocument: String, Identifiable {
     var title: String {
         switch self {
         case .melox: L10n.string("ui.legal.document.melox.title")
-        case .yesPlayMusic: L10n.string("ui.legal.document.yesplaymusic.title")
-        case .neteaseAPI: L10n.string("ui.legal.document.netease_api.title")
         case .pvTool: L10n.string("ui.legal.document.pv_tool.title")
         case .sourceHanSerif: L10n.string("ui.legal.document.source_han_serif.title")
         case .beatNet: L10n.string("ui.legal.document.beatnet.title")
@@ -175,10 +156,6 @@ enum LegalDocument: String, Identifiable {
         switch self {
         case .melox:
             L10n.string("ui.legal.document.melox.fallback")
-        case .yesPlayMusic:
-            L10n.string("ui.legal.document.yesplaymusic.fallback")
-        case .neteaseAPI:
-            Self.neteaseAPIText
         case .pvTool:
             Self.pvToolText
         case .sourceHanSerif:
@@ -197,10 +174,6 @@ enum LegalDocument: String, Identifiable {
         switch self {
         case .melox:
             URL(string: "https://github.com/youshen2/MeloX/blob/master/LICENSE")
-        case .yesPlayMusic:
-            URL(string: "https://github.com/qier222/YesPlayMusic/blob/main/LICENSE")
-        case .neteaseAPI:
-            URL(string: "https://github.com/neteasecloudmusicapienhanced/api-enhanced")
         case .pvTool:
             URL(string: "https://github.com/DanteAlighieri13210914/pv-tool")
         case .sourceHanSerif:
@@ -228,36 +201,6 @@ enum LegalDocument: String, Identifiable {
         return contents.joined(separator: "\n\n──────────\n\n")
     }
 
-    private static var neteaseAPIText: String {
-        let documents = [
-            (
-                L10n.string("ui.legal.document.audio_fingerprint_notice_heading"),
-                "NeteaseAudioFingerprint-NOTICE",
-                "txt"
-            ),
-            (
-                L10n.string("ui.legal.license.mit"),
-                "NeteaseAPI-LICENSE",
-                "txt"
-            ),
-        ]
-        let contents = documents.compactMap {
-            title,
-            name,
-            fileExtension in
-            bundledText(
-                named: name,
-                extension: fileExtension
-            ).map {
-                "\(title)\n\n\($0)"
-            }
-        }
-        guard !contents.isEmpty else {
-            return L10n.string("ui.legal.document.netease_api.fallback")
-        }
-        return contents.joined(separator: "\n\n──────────\n\n")
-    }
-
     private static func bundledText(
         named name: String,
         extension fileExtension: String
@@ -266,16 +209,6 @@ enum LegalDocument: String, Identifiable {
             Bundle.main.url(
                 forResource: name,
                 withExtension: fileExtension
-            ),
-            Bundle.main.url(
-                forResource: name,
-                withExtension: fileExtension,
-                subdirectory: "AudioFingerprint"
-            ),
-            Bundle.main.url(
-                forResource: name,
-                withExtension: fileExtension,
-                subdirectory: "Resources/AudioFingerprint"
             ),
         ]
         guard let url = candidateURLs.compactMap({ $0 }).first else {

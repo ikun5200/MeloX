@@ -24,6 +24,7 @@ struct NowPlayingLyricsPage: View {
     let onInterfaceInteraction: (() -> Void)?
     let onInterfaceVisibilityChange: ((Bool) -> Void)?
     let onInitialFocusPrepared: (() -> Void)?
+    let onArtworkTap: (() -> Void)?
 
     init(
         song: Song,
@@ -39,7 +40,8 @@ struct NowPlayingLyricsPage: View {
         focusAnchorOffset: CGFloat? = nil,
         onInterfaceInteraction: (() -> Void)? = nil,
         onInterfaceVisibilityChange: ((Bool) -> Void)? = nil,
-        onInitialFocusPrepared: (() -> Void)? = nil
+        onInitialFocusPrepared: (() -> Void)? = nil,
+        onArtworkTap: (() -> Void)? = nil
     ) {
         self.song = song
         self.lyrics = lyrics
@@ -55,6 +57,7 @@ struct NowPlayingLyricsPage: View {
         self.onInterfaceInteraction = onInterfaceInteraction
         self.onInterfaceVisibilityChange = onInterfaceVisibilityChange
         self.onInitialFocusPrepared = onInitialFocusPrepared
+        self.onArtworkTap = onArtworkTap
     }
 
     var body: some View {
@@ -80,7 +83,8 @@ struct NowPlayingLyricsPage: View {
             song: song,
             artworkNamespace: artworkNamespace,
             usesReferenceLayout: usesReferencePortraitLayout,
-            usesArtworkTransition: usesArtworkTransition
+            usesArtworkTransition: usesArtworkTransition,
+            onArtworkTap: onArtworkTap
         )
     }
 

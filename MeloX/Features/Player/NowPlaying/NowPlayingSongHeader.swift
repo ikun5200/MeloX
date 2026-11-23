@@ -47,19 +47,22 @@ struct NowPlayingSongHeader: View {
     let usesReferenceLayout: Bool
     let usesArtworkTransition: Bool
     let showsArtwork: Bool
+    let onArtworkTap: (() -> Void)?
 
     init(
         song: Song,
         artworkNamespace: Namespace.ID,
         usesReferenceLayout: Bool,
         usesArtworkTransition: Bool = true,
-        showsArtwork: Bool = true
+        showsArtwork: Bool = true,
+        onArtworkTap: (() -> Void)? = nil
     ) {
         self.song = song
         self.artworkNamespace = artworkNamespace
         self.usesReferenceLayout = usesReferenceLayout
         self.usesArtworkTransition = usesArtworkTransition
         self.showsArtwork = showsArtwork
+        self.onArtworkTap = onArtworkTap
     }
 
     var body: some View {
@@ -108,6 +111,18 @@ struct NowPlayingSongHeader: View {
                 in: artworkNamespace,
                 isEnabled: usesArtworkTransition,
                 isSource: false
+            )
+            .contentShape(.rect)
+            .onTapGesture {
+                onArtworkTap?()
+            }
+            .allowsHitTesting(onArtworkTap != nil)
+            .accessibilityHidden(onArtworkTap == nil)
+            .accessibilityAddTraits(onArtworkTap == nil ? [] : .isButton)
+            .accessibilityLabel(
+                onArtworkTap == nil
+                    ? ""
+                    : L10n.string("ui.player.show_artwork_page")
             )
         } else {
             Color.clear

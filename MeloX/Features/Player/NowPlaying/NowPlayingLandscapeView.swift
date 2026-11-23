@@ -214,7 +214,8 @@ struct NowPlayingLandscapeView: View {
                     onInterfaceInteraction:
                         onInterfaceInteraction,
                     onInterfaceVisibilityChange:
-                        onInterfaceVisibilityChange
+                        onInterfaceVisibilityChange,
+                    onArtworkTap: { page = .artwork }
                 )
                 .accessibilityAction(
                     named: lyricsInterfaceAccessibilityActionName
@@ -247,7 +248,8 @@ struct NowPlayingLandscapeView: View {
             onInterfaceInteraction: onInterfaceInteraction,
             onInterfaceVisibilityChange:
                 onInterfaceVisibilityChange,
-            onInitialFocusPrepared: onLyricsContentPrepared
+            onInitialFocusPrepared: onLyricsContentPrepared,
+            onArtworkTap: { page = .artwork }
         )
         .id(song.id)
         .nowPlayingLyricsPagePresentation(
