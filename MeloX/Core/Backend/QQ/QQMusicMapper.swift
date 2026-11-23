@@ -101,7 +101,16 @@ nonisolated enum QQMusicMapper {
     static func albumDetail(
         _ value: QQAlbumDetail
     ) -> (Album, [Song]) {
-        (album(value.album), value.songs.map(song))
+        let mapped = album(value.album)
+        let detailedAlbum = Album(
+            id: mapped.id,
+            mid: mapped.mid,
+            name: mapped.name,
+            picURL: mapped.picURL,
+            artists: mapped.artists,
+            albumDescription: value.description
+        )
+        return (detailedAlbum, value.songs.map(song))
     }
 
     static func artistDetail(
