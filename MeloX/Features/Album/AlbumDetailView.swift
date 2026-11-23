@@ -198,7 +198,7 @@ struct AlbumDetailView: View {
     }
 
     private var artworkTransitionAnimation: Animation? {
-        accessibilityReduceMotion ? nil : .easeOut(duration: 0.18)
+        accessibilityReduceMotion ? nil : .easeInOut(duration: 0.35)
     }
 
     private var isInitialLoading: Bool {
