@@ -5,6 +5,7 @@ struct SettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(LibraryStore.self) private var library
     @Environment(PlayerStore.self) private var player
+    @Environment(NeteaseAPI.self) private var api
 
     @State private var searchText = ""
     @State private var showsResetConfirmation = false
@@ -80,7 +81,7 @@ struct SettingsView: View {
     @ViewBuilder
     private var settingsContent: some View {
         Group {
-            if showsAccount {
+            if showsAccount, !api.isUsingSourceResolver {
                 SettingsAccountSection()
             }
 

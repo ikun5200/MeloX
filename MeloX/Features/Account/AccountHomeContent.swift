@@ -101,15 +101,6 @@ private struct AccountProfileDetailHero: View {
                 playlistCount: profile.playlistCount ?? playlistCount
             )
             .padding(.top, 20)
-
-            NavigationLink {
-                UserListeningRankView(userID: profile.id)
-            } label: {
-                Label("ui.library.my_listening_rank", systemImage: "chart.bar.xaxis")
-            }
-            .buttonStyle(.bordered)
-            .padding(.top, 14)
-            .accessibilityHint("ui.library.my_listening_rank.hint")
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 26)

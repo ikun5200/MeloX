@@ -508,7 +508,7 @@ struct PlaylistDetailView: View {
             return
         }
         #endif
-        let accountToken = settings.cookie.hashValue
+        let accountToken = api.accountScope.hashValue
         songToLocate = nil
         trackLocator.reset()
         locateErrorMessage = nil
@@ -548,7 +548,7 @@ struct PlaylistDetailView: View {
                 throw APIError.invalidResponse
             }
             try await transitionDelay.value
-            guard accountToken == settings.cookie.hashValue else { return }
+            guard accountToken == api.accountScope.hashValue else { return }
             playlist = loadedPlaylist
             contentAccountToken = accountToken
             loadedTrackOffset = min(
@@ -633,7 +633,7 @@ struct PlaylistDetailView: View {
     }
 
     private func persistContent() async {
-        guard let playlist, contentAccountToken == settings.cookie.hashValue else { return }
+        guard let playlist, contentAccountToken == api.accountScope.hashValue else { return }
         await api.pageContentCache.store(
             PlaylistContentSnapshot(playlist: playlist, loadedTrackOffset: loadedTrackOffset),
             for: PlaylistContentSnapshot.cacheKey(id: id)

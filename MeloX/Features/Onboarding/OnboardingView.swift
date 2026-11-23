@@ -65,7 +65,7 @@ struct OnboardingView: View {
                 }
             case .neteaseLogin:
                 NavigationStack {
-                    NeteaseLoginView()
+                    QQLoginView()
                 }
             }
         }

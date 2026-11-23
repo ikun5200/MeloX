@@ -13,20 +13,6 @@ struct LibraryPlaylistsView: View {
 
     var body: some View {
         List {
-            if !isSearching, let userID = library.profile?.id {
-                Section("ui.library.section.mine") {
-                    NavigationLink {
-                        UserListeningRankView(userID: userID)
-                    } label: {
-                        Label(
-                            "ui.library.my_listening_rank",
-                            systemImage: "chart.bar.xaxis"
-                        )
-                    }
-                    .accessibilityHint("ui.library.my_listening_rank.hint")
-                }
-            }
-
             Section(
                 isSearching
                     ? L10n.string("ui.common.search_results")

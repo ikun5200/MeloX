@@ -954,11 +954,11 @@
 "ui.legal.projects_licenses.title" = "Projects & Licenses";
 "ui.onboarding.account.logged_in_message" = "Your favorite songs, playlists, and listening history appear in Library.";
 "ui.onboarding.start" = "Start Using MeloX";
-"ui.account.login_netease" = "Sign In to NetEase Cloud Music";
-"ui.service.netease_cloud_music" = "NetEase Cloud Music";
-"ui.account.netease_account" = "NetEase Cloud Music Account";
+"ui.account.login_netease" = "Sign In to QQ Music";
+"ui.service.netease_cloud_music" = "QQ Music";
+"ui.account.netease_account" = "QQ Music Account";
 "ui.account.logged_in" = "Signed In";
-"ui.onboarding.account.connect" = "Connect NetEase Cloud Music";
+"ui.onboarding.account.connect" = "Connect QQ Music";
 "ui.onboarding.account.connect_message" = "Sign in to sync your personal music library and use account features. Signing in is not required to start using MeloX.";
 "ui.onboarding.benefit.sync_library" = "Sync favorite songs, playlists, and listening history";
 "ui.onboarding.benefit.personalized_content" = "Access Daily Recommendations and other personalized content";

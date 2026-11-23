@@ -26,8 +26,6 @@ struct NowPlayingSongActions: View {
                     .presentationDragIndicator(.visible)
             case .comments(let selectedSong):
                 SongCommentsSheet(song: selectedSong)
-            case .songWiki(let selectedSong):
-                SongWikiSheet(song: selectedSong)
             case .listenTogether:
                 ListenTogetherView()
                     .presentationDetents([.medium, .large])
@@ -139,14 +137,6 @@ struct NowPlayingSongActions: View {
                     )
                 }
                 Button {
-                    presentedSheet = .songWiki(song)
-                } label: {
-                    Label(
-                        "ui.song.wiki.title",
-                        systemImage: "book.pages"
-                    )
-                }
-                Button {
                     presentedSheet = .listenTogether
                 } label: {
                     Label(
@@ -250,7 +240,6 @@ struct NowPlayingSongActions: View {
 private enum NowPlayingSongSheet: Identifiable {
     case addToPlaylist(Song)
     case comments(Song)
-    case songWiki(Song)
     case listenTogether
     case sleepTimer
     case beatNetDebug
@@ -260,8 +249,6 @@ private enum NowPlayingSongSheet: Identifiable {
             "add-to-playlist-\(song.id)"
         case .comments(let song):
             "comments-\(song.id)"
-        case .songWiki(let song):
-            "song-wiki-\(song.id)"
         case .listenTogether:
             "listen-together"
         case .sleepTimer:

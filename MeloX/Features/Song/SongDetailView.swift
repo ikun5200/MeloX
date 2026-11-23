@@ -80,8 +80,6 @@ struct SongDetailView: View {
             switch sheet {
             case .comments(let selectedSong):
                 SongCommentsSheet(song: selectedSong)
-            case .songWiki(let selectedSong):
-                SongWikiSheet(song: selectedSong)
             }
         }
         .task(id: song.id) {
@@ -162,12 +160,6 @@ struct SongDetailView: View {
 
     private var informationSection: some View {
         Section("ui.song.information") {
-            Button {
-                presentedSheet = .songWiki(song)
-            } label: {
-                Label("ui.song.wiki.title", systemImage: "book.pages")
-            }
-
             ForEach(song.artists) { artist in
                 NavigationLink(value: MusicRoute.artist(artist)) {
                     LabeledContent(L10n.string("ui.common.artist"), value: artist.name)
@@ -209,14 +201,11 @@ struct SongDetailView: View {
 
 private enum SongDetailSheet: Identifiable {
     case comments(Song)
-    case songWiki(Song)
 
     var id: String {
         switch self {
         case .comments(let song):
             "comments-\(song.id)"
-        case .songWiki(let song):
-            "song-wiki-\(song.id)"
         }
     }
 }

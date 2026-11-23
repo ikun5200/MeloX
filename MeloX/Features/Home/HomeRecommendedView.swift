@@ -56,7 +56,7 @@ struct HomeRecommendedView: View {
         .task(
             id: HomeRecommendedLoadRequest(
                 reloadToken: reloadToken,
-                accountToken: settings.cookie.hashValue,
+                accountToken: api.accountScope.hashValue,
                 musicArea: settings.musicArea
             )
         ) {
@@ -267,7 +267,7 @@ struct HomeRecommendedView: View {
 
         do {
             let primaryContext = HomeRecommendedPrimaryContext(
-                accountToken: settings.cookie.hashValue,
+                accountToken: api.accountScope.hashValue,
                 musicArea: settings.musicArea
             )
             if displayedPrimaryContext != primaryContext {
@@ -389,7 +389,7 @@ struct HomeRecommendedView: View {
     private func persistContent() async {
         guard let payload, !feed.sections.isEmpty,
               displayedPrimaryContext == HomeRecommendedPrimaryContext(
-                accountToken: settings.cookie.hashValue,
+                accountToken: api.accountScope.hashValue,
                 musicArea: settings.musicArea
               ) else { return }
         await api.pageContentCache.store(

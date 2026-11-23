@@ -76,9 +76,26 @@ enum NeteaseShareResource: Hashable, Identifiable {
     }
 
     var webURL: URL {
-        URL(
-            string: "https://music.163.com/\(resourceType)?id=\(resourceID)"
-        )!
+        switch self {
+        case .song(let song):
+            if !song.mid.isEmpty {
+                return URL(
+                    string: "https://y.qq.com/n/ryqq/songDetail/\(song.mid)"
+                )!
+            }
+            return URL(string: "https://y.qq.com/")!
+        case .playlist(let playlist):
+            return URL(
+                string: "https://y.qq.com/n/ryqq/playlist/\(playlist.id)"
+            )!
+        case .album(let album):
+            if !album.mid.isEmpty {
+                return URL(
+                    string: "https://y.qq.com/n/ryqq/albumDetail/\(album.mid)"
+                )!
+            }
+            return URL(string: "https://y.qq.com/")!
+        }
     }
 
     var supportsTimelineSharing: Bool {

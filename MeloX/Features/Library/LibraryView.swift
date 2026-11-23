@@ -4,6 +4,7 @@ struct LibraryView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(LibraryStore.self) private var library
     @Environment(AppSettings.self) private var settings
+    @Environment(NeteaseAPI.self) private var api
 
     private let fixedPage: LibraryPage?
     private let showsNavigationTitle: Bool
@@ -112,10 +113,14 @@ struct LibraryView: View {
         }
         .sheet(isPresented: $showsLogin) {
             NavigationStack {
-                NeteaseLoginView()
+                if api.isUsingSourceResolver {
+                    QQLoginView()
+                } else {
+                    NeteaseLoginView()
+                }
             }
         }
-        .task(id: settings.cookie) {
+        .task(id: api.accountScope) {
             await library.refresh()
         }
         .alert(

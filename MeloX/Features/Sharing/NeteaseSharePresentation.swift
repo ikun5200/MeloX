@@ -43,23 +43,7 @@ extension EnvironmentValues {
 struct NeteaseShareMenuContent: View {
     let resource: NeteaseShareResource
 
-    @Environment(\.openNeteaseShare) private var openNeteaseShare
-
     var body: some View {
-        Button {
-            openNeteaseShare(resource, mode: .privateMessage)
-        } label: {
-            Label("ui.sharing.netease_private_message", systemImage: "paperplane")
-        }
-
-        if resource.supportsTimelineSharing {
-            Button {
-                openNeteaseShare(resource, mode: .timeline)
-            } label: {
-                Label("ui.sharing.forward_to_feed", systemImage: "arrowshape.turn.up.right")
-            }
-        }
-
         ShareLink(item: resource.webURL) {
             Label("ui.sharing.system_share", systemImage: "square.and.arrow.up")
         }
