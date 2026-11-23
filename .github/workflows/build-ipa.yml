@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - qq-migration
     tags:
       - "v*"
 
@@ -73,6 +74,52 @@ jobs:
           path: build/MeloX-iOS-unsigned.ipa
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish latest IPA release / 发布最新 IPA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          TAG="ios-latest"
+          TITLE="MeloX iOS 开发版（最新构建）"
+          NOTES="$(mktemp)"
+
+          {
+            echo "MeloX QQ 音乐迁移版，未签名 IPA。"
+            echo
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Build: \`${GITHUB_RUN_NUMBER}\`"
+            echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "- Built at: $(date -u '+%Y-%m-%d %H:%M UTC')"
+            echo
+            echo "\`MeloX-iOS-unsigned.ipa\` 未签名，安装前需要自行签名。"
+            if [[ -f build/ReleaseNotes.md ]]; then
+              echo
+              echo "## 更新内容 / What's New"
+              echo
+              cat build/ReleaseNotes.md
+            fi
+          } > "${NOTES}"
+
+          if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release edit "${TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "${TITLE}" \
+              --notes-file "${NOTES}" \
+              --prerelease
+            gh release upload "${TAG}" \
+              "build/MeloX-iOS-unsigned.ipa#MeloX-iOS-unsigned.ipa" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --clobber
+          else
+            gh release create "${TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "${TITLE}" \
+              --notes-file "${NOTES}" \
+              --prerelease \
+              "build/MeloX-iOS-unsigned.ipa#MeloX-iOS-unsigned.ipa"
+          fi
 
       - name: Prepare release body / 准备发版说明
         if: startsWith(github.ref, 'refs/tags/v')
