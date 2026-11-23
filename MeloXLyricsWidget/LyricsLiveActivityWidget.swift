@@ -3,58 +3,34 @@ import SwiftUI
 import WidgetKit
 
 struct LyricsLiveActivityWidget: Widget {
-    private static let nowPlayingURL =
-        URL(string: "melox://now-playing")!
-
     var body: some WidgetConfiguration {
         ActivityConfiguration(
             for: LyricsLiveActivityAttributes.self
         ) { context in
             lockScreenContent(context.state)
-                .widgetURL(Self.nowPlayingURL)
                 .activityBackgroundTint(.black.opacity(0.92))
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Link(destination: Self.nowPlayingURL) {
-                        artwork(context.state, size: 42)
-                    }
+                    artwork(context.state, size: 42)
                 }
 
                 DynamicIslandExpandedRegion(.trailing) {
-                    Link(destination: Self.nowPlayingURL) {
-                        Image(
-                            systemName: context.state.isPlaying
-                                ? "waveform"
-                                : "pause.fill"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                }
-
-                // Keep the empty middle of the expanded island tappable;
-                // otherwise a tap between the artwork and the bottom text
-                // does nothing.
-                DynamicIslandExpandedRegion(.center) {
-                    Link(destination: Self.nowPlayingURL) {
-                        Color.white.opacity(0.001)
-                            .frame(
-                                maxWidth: .infinity,
-                                maxHeight: .infinity
-                            )
-                            .contentShape(.rect)
-                    }
+                    Image(
+                        systemName: context.state.isPlaying
+                            ? "waveform"
+                            : "pause.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 DynamicIslandExpandedRegion(
                     .bottom,
                     priority: 1
                 ) {
-                    Link(destination: Self.nowPlayingURL) {
-                        expandedContent(context.state)
-                    }
+                    expandedContent(context.state)
                 }
             } compactLeading: {
                 compactLeadingContent(context.state)
@@ -63,10 +39,6 @@ struct LyricsLiveActivityWidget: Widget {
             } minimal: {
                 artwork(context.state, size: 24)
             }
-            // Only a URL on the DynamicIsland itself is honored for
-            // compact/minimal taps; per-view URLs inside those regions
-            // are ignored.
-            .widgetURL(Self.nowPlayingURL)
             .keylineTint(.red)
         }
     }
