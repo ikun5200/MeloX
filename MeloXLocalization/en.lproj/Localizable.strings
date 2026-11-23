@@ -992,7 +992,7 @@
 "ui.legal.netease_audio_fingerprint" = "@neteaseapireborn/api Audio Fingerprint";
 "ui.legal.reference.better_lyrics" = "Reference for word-by-word lyric rendering, glow, and motion";
 "ui.legal.reference.lyricify" = "Reference for YRC/QRC word-timed lyric parsing";
-"ui.legal.reference.yesplaymusic" = "Reference for NetEase APIs and player implementation";
+"ui.legal.reference.yesplaymusic" = "Player implementation reference";
 "ui.legal.reference.netease_api" = "Song-recognition routes and audio-fingerprint runtime";
 "ui.legal.reference.pv_tool" = "Original implementation of Text PV templates and effects";
 "ui.legal.reference.beatnet" = "Beat, downbeat, and tempo analysis model for AutoMix";
@@ -1006,7 +1006,7 @@
 "ui.legal.document.source_han_serif.title" = "Source Han Serif License";
 "ui.legal.document.beatnet.title" = "BeatNet Model License";
 "ui.legal.document.melox.fallback" = "The MeloX application is released under GNU General Public License version 3. When copying, modifying, or distributing it, retain copyright and license notices and comply with GPLv3 source-code availability and same-license distribution requirements. Separate licenses for third-party code and resources remain in effect.";
-"ui.legal.document.yesplaymusic.fallback" = "MeloX’s NetEase APIs and player implementation reference qier222/YesPlayMusic. YesPlayMusic is released under the MIT License, Copyright © 2020–2023 qier222. Its copyright and license notices must be retained when using the software or substantial portions of it.";
+"ui.legal.document.yesplaymusic.fallback" = "MeloX’s player implementation references qier222/YesPlayMusic. YesPlayMusic is released under the MIT License, Copyright © 2020–2023 qier222. Its copyright and license notices must be retained when using the software or substantial portions of it.";
 "ui.legal.document.source_han_serif.fallback" = "Source Han Serif is licensed under the SIL Open Font License 1.1. The full license is included with the app resources.";
 "ui.legal.document.beatnet.fallback" = "MeloX uses Mojtaba Heydari’s BeatNet generic model converted to Core ML. The model is licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).";
 "ui.legal.document.pv_tool.fallback" = "PV Tool uses a Non-Commercial License. It may not be used in commercial products, paid services, or other commercial settings without written permission from the author. Commercial use requires separate authorization from the original author.";

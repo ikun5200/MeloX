@@ -34,6 +34,11 @@ struct ProjectLicensesView: View {
                     document: .melox
                 )
                 licenseLink(
+                    title: "YesPlayMusic",
+                    license: L10n.string("ui.legal.license.mit"),
+                    document: .yesPlayMusic
+                )
+                licenseLink(
                     title: "PV Tool",
                     license: L10n.string("ui.legal.license.noncommercial"),
                     document: .pvTool
@@ -60,6 +65,11 @@ struct ProjectLicensesView: View {
                     name: "WXRIW/Lyricify-Lyrics-Helper",
                     contribution: L10n.string("ui.legal.reference.lyricify"),
                     url: URL(string: "https://github.com/WXRIW/Lyricify-Lyrics-Helper")!
+                )
+                projectLink(
+                    name: "qier222/YesPlayMusic",
+                    contribution: L10n.string("ui.legal.reference.yesplaymusic"),
+                    url: URL(string: "https://github.com/qier222/YesPlayMusic")!
                 )
                 projectLink(
                     name: "L-1124/QQMusicApi",
@@ -137,6 +147,7 @@ struct ProjectLicensesView: View {
 
 enum LegalDocument: String, Identifiable {
     case melox
+    case yesPlayMusic
     case pvTool
     case sourceHanSerif
     case beatNet
@@ -146,6 +157,7 @@ enum LegalDocument: String, Identifiable {
     var title: String {
         switch self {
         case .melox: L10n.string("ui.legal.document.melox.title")
+        case .yesPlayMusic: L10n.string("ui.legal.document.yesplaymusic.title")
         case .pvTool: L10n.string("ui.legal.document.pv_tool.title")
         case .sourceHanSerif: L10n.string("ui.legal.document.source_han_serif.title")
         case .beatNet: L10n.string("ui.legal.document.beatnet.title")
@@ -156,6 +168,8 @@ enum LegalDocument: String, Identifiable {
         switch self {
         case .melox:
             L10n.string("ui.legal.document.melox.fallback")
+        case .yesPlayMusic:
+            L10n.string("ui.legal.document.yesplaymusic.fallback")
         case .pvTool:
             Self.pvToolText
         case .sourceHanSerif:
@@ -174,6 +188,8 @@ enum LegalDocument: String, Identifiable {
         switch self {
         case .melox:
             URL(string: "https://github.com/youshen2/MeloX/blob/master/LICENSE")
+        case .yesPlayMusic:
+            URL(string: "https://github.com/qier222/YesPlayMusic/blob/main/LICENSE")
         case .pvTool:
             URL(string: "https://github.com/DanteAlighieri13210914/pv-tool")
         case .sourceHanSerif:

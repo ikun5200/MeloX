@@ -992,7 +992,7 @@
 "ui.legal.netease_audio_fingerprint" = "@neteaseapireborn/api 音频指纹";
 "ui.legal.reference.better_lyrics" = "逐字歌词渲染、光效与动效参考";
 "ui.legal.reference.lyricify" = "YRC/QRC 逐字歌词解析参考";
-"ui.legal.reference.yesplaymusic" = "网易云接口与播放器实现参考";
+"ui.legal.reference.yesplaymusic" = "播放器实现参考";
 "ui.legal.reference.netease_api" = "听歌识曲路由与音频指纹运行时";
 "ui.legal.reference.pv_tool" = "文字 PV 模板与效果的原始实现";
 "ui.legal.reference.beatnet" = "自动混音的节拍、重拍与速度分析模型";
@@ -1006,7 +1006,7 @@
 "ui.legal.document.source_han_serif.title" = "思源宋体许可证";
 "ui.legal.document.beatnet.title" = "BeatNet 模型许可";
 "ui.legal.document.melox.fallback" = "MeloX 应用主体以 GNU General Public License version 3 发布。复制、修改或分发时，应保留版权与许可声明，并遵守 GPLv3 的源代码提供及同许可证分发要求。第三方代码和资源的单独许可证仍然有效。";
-"ui.legal.document.yesplaymusic.fallback" = "MeloX 的网易云接口和播放器实现参考了 qier222/YesPlayMusic。YesPlayMusic 以 MIT License 发布，Copyright © 2020–2023 qier222；使用其软件或重要部分时需保留原版权和许可声明。";
+"ui.legal.document.yesplaymusic.fallback" = "MeloX 的播放器实现参考了 qier222/YesPlayMusic。YesPlayMusic 以 MIT License 发布，Copyright © 2020–2023 qier222；使用其软件或重要部分时需保留原版权和许可声明。";
 "ui.legal.document.source_han_serif.fallback" = "思源宋体使用 SIL Open Font License 1.1。完整许可证随应用资源一同提供。";
 "ui.legal.document.beatnet.fallback" = "MeloX 使用 Mojtaba Heydari 的 BeatNet 通用模型，并将其转换为 Core ML 格式。模型以 Creative Commons Attribution 4.0 International（CC BY 4.0）许可。";
 "ui.legal.document.pv_tool.fallback" = "PV Tool 使用 Non-Commercial License。未经作者书面许可，不得用于商业产品、付费服务或其他商业场景。商业使用需要联系原作者取得单独授权。";
