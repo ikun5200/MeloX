@@ -2200,7 +2200,7 @@
 "ui.sources.local" = "Local file";
 
 "ui.settings.qq_account.title" = "QQ Music Account";
-"ui.settings.qq_account.subtitle" = "Sign in to sync favorites, playlists and messages";
+"ui.settings.qq_account.subtitle" = "Sign in to sync favorites and playlists";
 "ui.settings.qq_account.keywords" = "QQ Music|account|login|QR|WeChat|phone";
 "ui.settings.qq_account.music_id" = "QQ Music ID";
 "ui.settings.qq_account.login_type" = "Sign-in method";

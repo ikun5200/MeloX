@@ -63,7 +63,7 @@ struct Harness {
             LXQualityMapping.candidates(
                 for: .high,
                 supported: ["flac"]
-            ) == ["320k", "128k"]
+            ) == ["flac"]
         )
         precondition(
             LXQualityMapping.candidates(

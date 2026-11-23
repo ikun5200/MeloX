@@ -33,7 +33,13 @@ nonisolated enum LXQualityMapping {
         guard !declared.isEmpty else { return preference }
 
         let filtered = preference.filter { declared.contains($0) }
-        return filtered.isEmpty ? preference : filtered
+        if !filtered.isEmpty { return filtered }
+        // 请求档位与源声明没有交集时，退回源声明中的第一个可用档位，
+        // 避免向源请求它明确不支持的音质。
+        let fallback = supported
+            .map { $0.lowercased() }
+            .first { !$0.isEmpty }
+        return fallback.map { [$0] } ?? preference
     }
 
     static func quality(for value: String) -> MusicQuality? {

@@ -81,7 +81,39 @@ struct SettingsView: View {
     @ViewBuilder
     private var settingsContent: some View {
         Group {
-            if showsAccount, !api.isUsingSourceResolver {
+            if showsAccount, api.isUsingSourceResolver {
+                NavigationLink(value: SettingsRoute.qqAccount) {
+                    HStack(spacing: 14) {
+                        Image(systemName: "person.crop.circle.fill")
+                            .font(.system(size: 42))
+                            .foregroundStyle(.red)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(
+                                library.profile?.nickname
+                                    ?? L10n.string("ui.settings.qq_account.title")
+                            )
+                            .font(.headline)
+                            Text(
+                                library.isLoggedIn
+                                    ? L10n.string("ui.account.logged_in")
+                                    : L10n.string("ui.settings.qq_account.subtitle")
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(16)
+                    .background(
+                        Color(uiColor: .secondarySystemGroupedBackground),
+                        in: .rect(cornerRadius: 18, style: .continuous)
+                    )
+                }
+                .buttonStyle(.plain)
+            } else if showsAccount, !api.isUsingSourceResolver {
                 SettingsAccountSection()
             }
 

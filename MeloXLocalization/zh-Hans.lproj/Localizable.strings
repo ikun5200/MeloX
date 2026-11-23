@@ -2200,7 +2200,7 @@
 "ui.sources.local" = "本地文件";
 
 "ui.settings.qq_account.title" = "QQ 音乐账号";
-"ui.settings.qq_account.subtitle" = "登录后同步收藏、歌单与私信";
+"ui.settings.qq_account.subtitle" = "登录后同步收藏与歌单";
 "ui.settings.qq_account.keywords" = "QQ音乐|账号|登录|扫码|微信|手机号";
 "ui.settings.qq_account.music_id" = "QQ 音乐 ID";
 "ui.settings.qq_account.login_type" = "登录方式";
