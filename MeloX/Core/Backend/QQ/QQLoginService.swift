@@ -693,7 +693,10 @@ final class QQLoginService {
             refreshToken: string(payload["refresh_token"]) ?? "",
             openID: string(payload["openid"]) ?? "",
             accessToken: string(payload["access_token"]) ?? "",
-            encryptUIN: string(payload["encryptUin"]) ?? "",
+            encryptUIN: string(payload["encryptUin"])
+                ?? string(payload["encrypt_uin"])
+                ?? string(payload["encryptuin"])
+                ?? "",
             loginType: int(payload["loginType"]) ?? inferredLoginType,
             expiredAt: int(payload["expired_at"]) ?? 0,
             musicKeyCreateTime: int(payload["musickeyCreateTime"]) ?? 0,
