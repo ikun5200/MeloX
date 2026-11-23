@@ -64,7 +64,9 @@ final class NowPlayingSession {
                 song.podcastMetadata.map {
                     "qqmusic:djprogram:\($0.programID)"
                 } ?? "qqmusic:song:\(song.id)",
-            MPNowPlayingInfoPropertyServiceIdentifier: "com.melox.qqmusic",
+            MPNowPlayingInfoPropertyServiceIdentifier:
+                Bundle.main.bundleIdentifier
+                    ?? "moye.MeloX",
             MPNowPlayingInfoPropertyPlaybackQueueIndex: max(queueIndex, 0),
             MPNowPlayingInfoPropertyPlaybackQueueCount: max(queueCount, 1),
         ]
