@@ -14,13 +14,17 @@ nonisolated func makeArtworkURL(from source: String?, dimension: Int = 1_024) ->
     if components.scheme?.lowercased() == "http" {
         components.scheme = "https"
     }
-    // 分类歌单的 coverImgUrl 常带有多段 imageView / watermark 查询参数，
-    // 再追加 param 会让网易云图片服务拒绝处理。路径本身就是原始封面，
-    // 统一移除服务端返回的处理链后请求固定尺寸即可。
-    components.query = nil
-    components.queryItems = [
-        URLQueryItem(name: "param", value: "\(dimension)y\(dimension)")
-    ]
+    // 只有网易云图片服务支持 `param=NyN` 裁剪。QQ 音乐返回的
+    // y.gtimg.cn 等地址本身就是最终图片，不能再追加参数。
+    if components.host?.hasSuffix("music.126.net") == true {
+        // 分类歌单的 coverImgUrl 常带有多段 imageView / watermark 查询参数，
+        // 再追加 param 会让网易云图片服务拒绝处理。路径本身就是原始封面，
+        // 统一移除服务端返回的处理链后请求固定尺寸即可。
+        components.query = nil
+        components.queryItems = [
+            URLQueryItem(name: "param", value: "\(dimension)y\(dimension)")
+        ]
+    }
     return components.url
 }
 
@@ -46,6 +50,7 @@ nonisolated func makeArtworkURL(fromNeteasePicID picID: Int64?, dimension: Int =
 
 nonisolated struct Artist: Codable, Hashable, Identifiable {
     let id: Int
+    let mid: String
     let name: String
     let picURL: String?
     let avatarURL: String?
@@ -59,12 +64,13 @@ nonisolated struct Artist: Codable, Hashable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, alias, picUrl, img1v1Url
+        case id, mid, name, alias, picUrl, img1v1Url
         case isFollowed = "followed"
     }
 
     init(
         id: Int,
+        mid: String = "",
         name: String,
         picURL: String? = nil,
         avatarURL: String? = nil,
@@ -72,6 +78,7 @@ nonisolated struct Artist: Codable, Hashable, Identifiable {
         isFollowed: Bool = false
     ) {
         self.id = id
+        self.mid = mid
         self.name = name
         self.picURL = picURL
         self.avatarURL = avatarURL
@@ -82,6 +89,7 @@ nonisolated struct Artist: Codable, Hashable, Identifiable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decodeIfPresent(Int.self, forKey: .id) ?? 0
+        mid = try container.decodeIfPresent(String.self, forKey: .mid) ?? ""
         name = try container.decodeIfPresent(String.self, forKey: .name)
             ?? L10n.string("ui.metadata.unknown_artist")
         picURL = try container.decodeIfPresent(String.self, forKey: .picUrl)
@@ -96,6 +104,7 @@ nonisolated struct Artist: Codable, Hashable, Identifiable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
+        try container.encode(mid, forKey: .mid)
         try container.encode(name, forKey: .name)
         try container.encodeIfPresent(picURL, forKey: .picUrl)
         try container.encodeIfPresent(avatarURL, forKey: .img1v1Url)
@@ -106,6 +115,7 @@ nonisolated struct Artist: Codable, Hashable, Identifiable {
 
 nonisolated struct Album: Codable, Hashable, Identifiable {
     let id: Int
+    let mid: String
     let name: String
     let picURL: String?
     let picID: Int64?
@@ -128,13 +138,14 @@ nonisolated struct Album: Codable, Hashable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, picUrl, blurPicUrl, artists, artist
+        case id, mid, name, picUrl, blurPicUrl, artists, artist
         case pic, picStr = "pic_str", picId, picIdStr = "picId_str"
         case publishTime, size, type, description
     }
 
     init(
         id: Int,
+        mid: String = "",
         name: String,
         picURL: String? = nil,
         picID: Int64? = nil,
@@ -145,6 +156,7 @@ nonisolated struct Album: Codable, Hashable, Identifiable {
         albumDescription: String? = nil
     ) {
         self.id = id
+        self.mid = mid
         self.name = name
         self.picURL = picURL
         self.picID = picID
@@ -158,6 +170,7 @@ nonisolated struct Album: Codable, Hashable, Identifiable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decodeIfPresent(Int.self, forKey: .id) ?? 0
+        mid = try container.decodeIfPresent(String.self, forKey: .mid) ?? ""
         name = try container.decodeIfPresent(String.self, forKey: .name)
             ?? L10n.string("ui.metadata.unknown_album")
         picURL = try container.decodeIfPresent(String.self, forKey: .picUrl)
@@ -179,6 +192,7 @@ nonisolated struct Album: Codable, Hashable, Identifiable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
+        try container.encode(mid, forKey: .mid)
         try container.encode(name, forKey: .name)
         try container.encodeIfPresent(picURL, forKey: .picUrl)
         try container.encodeIfPresent(picID, forKey: .pic)
@@ -213,6 +227,9 @@ nonisolated struct Album: Codable, Hashable, Identifiable {
 
 nonisolated struct Song: Codable, Hashable, Identifiable {
     let id: Int
+    let mid: String
+    let mediaMID: String?
+    let musicVideoMID: String?
     let name: String
     let artists: [Artist]
     let album: Album?
@@ -245,7 +262,8 @@ nonisolated struct Song: Codable, Hashable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, ar, artists, al, album, dt, duration, no, cd, fee
+        case id, mid, mediaMID, musicVideoMID
+        case name, ar, artists, al, album, dt, duration, no, cd, fee
         case aliases = "alia"
         case popularity = "pop"
         case publishTime, copyright
@@ -268,9 +286,15 @@ nonisolated struct Song: Codable, Hashable, Identifiable {
         copyright: Int? = nil,
         musicVideoID: Int? = nil,
         podcastMetadata: PodcastPlaybackMetadata? = nil,
-        audioAvailability: SongAudioAvailability = .unknown
+        audioAvailability: SongAudioAvailability = .unknown,
+        mid: String = "",
+        mediaMID: String? = nil,
+        musicVideoMID: String? = nil
     ) {
         self.id = id
+        self.mid = mid
+        self.mediaMID = mediaMID
+        self.musicVideoMID = musicVideoMID
         self.name = name
         self.artists = artists
         self.album = album
@@ -290,6 +314,9 @@ nonisolated struct Song: Codable, Hashable, Identifiable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decodeIfPresent(Int.self, forKey: .id) ?? 0
+        mid = try container.decodeIfPresent(String.self, forKey: .mid) ?? ""
+        mediaMID = try container.decodeIfPresent(String.self, forKey: .mediaMID)
+        musicVideoMID = try container.decodeIfPresent(String.self, forKey: .musicVideoMID)
         name = try container.decodeIfPresent(String.self, forKey: .name)
             ?? L10n.string("ui.metadata.unknown_song")
         artists = try container.decodeIfPresent([Artist].self, forKey: .ar)
@@ -318,6 +345,9 @@ nonisolated struct Song: Codable, Hashable, Identifiable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
+        try container.encode(mid, forKey: .mid)
+        try container.encodeIfPresent(mediaMID, forKey: .mediaMID)
+        try container.encodeIfPresent(musicVideoMID, forKey: .musicVideoMID)
         try container.encode(name, forKey: .name)
         try container.encode(artists, forKey: .ar)
         try container.encodeIfPresent(album, forKey: .al)
@@ -369,6 +399,7 @@ struct TrackReference: Codable, Hashable {
 
 struct Playlist: Codable, Hashable, Identifiable {
     let id: Int
+    let dirid: Int
     let name: String
     let coverURLString: String?
     let playlistDescription: String?
@@ -400,7 +431,7 @@ struct Playlist: Codable, Hashable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, coverImgUrl, picUrl, description, trackCount, playCount
+        case id, dirid, name, coverImgUrl, picUrl, description, trackCount, playCount
         case updateFrequency, copywriter, creator, tracks, trackIds, subscribed
         case toplistType = "ToplistType"
     }
@@ -418,9 +449,11 @@ struct Playlist: Codable, Hashable, Identifiable {
         creator: UserSummary? = nil,
         tracks: [Song] = [],
         trackIDs: [TrackReference] = [],
-        subscribed: Bool = false
+        subscribed: Bool = false,
+        dirid: Int = 0
     ) {
         self.id = id
+        self.dirid = dirid
         self.name = name
         self.coverURLString = coverURLString
         self.playlistDescription = playlistDescription
@@ -438,6 +471,7 @@ struct Playlist: Codable, Hashable, Identifiable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decodeIfPresent(Int.self, forKey: .id) ?? 0
+        dirid = try container.decodeIfPresent(Int.self, forKey: .dirid) ?? 0
         name = try container.decodeIfPresent(String.self, forKey: .name)
             ?? L10n.string("ui.metadata.unknown_playlist")
         coverURLString = try container.decodeIfPresent(String.self, forKey: .coverImgUrl)
@@ -457,6 +491,7 @@ struct Playlist: Codable, Hashable, Identifiable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
+        try container.encode(dirid, forKey: .dirid)
         try container.encode(name, forKey: .name)
         try container.encodeIfPresent(coverURLString, forKey: .coverImgUrl)
         try container.encodeIfPresent(playlistDescription, forKey: .description)

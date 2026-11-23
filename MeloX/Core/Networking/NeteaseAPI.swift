@@ -63,6 +63,9 @@ final class NeteaseAPI {
     let client: NeteaseDirectClient
 
     @ObservationIgnored
+    let qq: QQMusicClient
+
+    @ObservationIgnored
     let pageContentCache: PageContentCache
 
     private var playbackQuality: MusicQuality {
@@ -73,6 +76,7 @@ final class NeteaseAPI {
         self.settings = settings
         pageContentCache = PageContentCache(settings: settings)
         client = NeteaseDirectClient(settings: settings, session: session)
+        qq = QQMusicClient(session: session)
         pathMonitor.pathUpdateHandler = { [weak self] path in
             let isCellular = path.usesInterfaceType(.cellular)
             Task { @MainActor [weak self] in
@@ -519,17 +523,31 @@ final class NeteaseAPI {
     }
 
     func search(_ keywords: String, kind: SearchKind, limit: Int = 30) async throws -> SearchPayload {
-        let response: SearchResponse = try await client.eapi(
-            "/api/search/get",
-            data: ["s": keywords, "type": kind.rawValue, "limit": limit, "offset": 0]
+        let qqKind: QQSearchKind?
+        switch kind {
+        case .songs: qqKind = .songs
+        case .albums: qqKind = .albums
+        case .artists: qqKind = .artists
+        case .playlists: qqKind = .playlists
+        case .podcasts: qqKind = nil
+        }
+
+        guard let qqKind else {
+            return SearchPayload(
+                songs: nil,
+                albums: nil,
+                artists: nil,
+                playlists: nil,
+                podcasts: nil
+            )
+        }
+
+        let result = try await qq.search(
+            query: keywords,
+            kind: qqKind,
+            limit: limit
         )
-        return response.result ?? SearchPayload(
-            songs: nil,
-            albums: nil,
-            artists: nil,
-            playlists: nil,
-            podcasts: nil
-        )
+        return QQMusicMapper.searchPayload(result)
     }
 
     func dailySongs(afresh: Bool = false) async throws -> [Song] {
