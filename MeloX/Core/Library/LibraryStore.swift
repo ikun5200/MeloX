@@ -248,32 +248,6 @@ final class LibraryStore {
                 )
             }
 
-            if settings.isContentFeatureEnabled(.podcasts),
-               !api.isUsingSourceResolver {
-                do {
-                    let page = try await api.subscribedPodcasts(
-                        limit: subscribedPodcastPageSize
-                    )
-                    guard isCurrentRefresh(cookie) else { return }
-                    subscribedPodcasts = normalizedSubscribedPodcasts(
-                        page.podcasts
-                    )
-                    subscribedPodcastTotalCount = max(
-                        page.totalCount ?? subscribedPodcasts.count,
-                        subscribedPodcasts.count
-                    )
-                    subscribedPodcastsNextOffset = page.podcasts.count
-                    hasMoreSubscribedPodcasts = page.hasMore
-                    subscribedPodcastsLoadMoreError = nil
-                } catch is CancellationError {
-                    return
-                } catch {
-                    partialFailures.append(
-                        L10n.format("ui.library.error.subscribed_podcasts", error.localizedDescription)
-                    )
-                }
-            }
-
             do {
                 if api.isUsingSourceResolver {
                     let songs = try await api.sourceLikedSongs()
@@ -468,30 +442,7 @@ final class LibraryStore {
     }
 
     func loadMoreSubscribedPodcasts() async {
-        guard settings.isContentFeatureEnabled(.podcasts) else { return }
-        if let subscribedPodcastPageLoadTask {
-            await subscribedPodcastPageLoadTask.value
-            return
-        }
-
-        guard hasMoreSubscribedPodcasts else { return }
-
-        let requestedOffset = subscribedPodcastsNextOffset
-        let loadID = UUID()
-        let loadTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            await self.loadSubscribedPodcastPage(
-                offset: requestedOffset
-            )
-        }
-        subscribedPodcastPageLoadID = loadID
-        subscribedPodcastPageLoadTask = loadTask
-
-        await loadTask.value
-
-        guard subscribedPodcastPageLoadID == loadID else { return }
-        subscribedPodcastPageLoadTask = nil
-        subscribedPodcastPageLoadID = nil
+        return
     }
 
     func loadRemainingSubscribedPodcasts() async {

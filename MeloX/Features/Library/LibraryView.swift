@@ -55,8 +55,6 @@ struct LibraryView: View {
                 LibraryDownloadsView(searchQuery: searchQuery)
             } else if !library.isLoggedIn {
                 loginUnavailableView
-            } else if section == .cloud {
-                CloudMusicView(searchQuery: searchQuery)
             } else {
                 libraryContent
             }
@@ -186,12 +184,8 @@ struct LibraryView: View {
                 LibraryArtistsView(searchQuery: searchQuery)
             case .albums:
                 LibraryAlbumsView(searchQuery: searchQuery)
-            case .podcasts:
-                SubscribedPodcastsView(searchQuery: searchQuery)
             case .downloads:
                 LibraryDownloadsView(searchQuery: searchQuery)
-            case .cloud:
-                CloudMusicView(searchQuery: searchQuery)
             case .history:
                 LibraryHistoryView(searchQuery: searchQuery)
             }
@@ -213,14 +207,10 @@ struct LibraryView: View {
             L10n.string("ui.library.artists.search")
         case .albums:
             L10n.string("ui.library.search.favorite_albums")
-        case .podcasts:
-            L10n.string("ui.library.search.subscribed_podcasts")
         case .downloads:
             AppFeatureAvailability.downloads
                 ? L10n.string("ui.library.search.downloads")
                 : L10n.string("ui.library.search.songs")
-        case .cloud:
-            L10n.string("ui.library.search.cloud")
         case .history:
             L10n.string("ui.library.search.history")
         }

@@ -5,7 +5,6 @@ struct NowPlayingSongActions: View {
     @Environment(AppSettings.self) private var settings
     @Environment(LibraryStore.self) private var library
     @Environment(PlayerStore.self) private var player
-    @Environment(ListenTogetherStore.self) private var listenTogether
 
     let song: Song
     var showsFavoriteButton = true
@@ -26,10 +25,6 @@ struct NowPlayingSongActions: View {
                     .presentationDragIndicator(.visible)
             case .comments(let selectedSong):
                 SongCommentsSheet(song: selectedSong)
-            case .listenTogether:
-                ListenTogetherView()
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
             case .sleepTimer:
                 PlaybackSleepTimerSheet()
                     .presentationDetents([.medium])
@@ -79,127 +74,94 @@ struct NowPlayingSongActions: View {
             }
 
             Divider()
-            if let podcast = song.podcastMetadata {
+            ControlGroup {
                 Button {
-                    player.addToPlaybackQueue(song)
+                    presentedSheet = .addToPlaylist(song)
                 } label: {
                     Label(
-                        "ui.player.add_to_queue",
-                        systemImage: "text.badge.plus"
-                    )
-                }
-                if settings.isContentFeatureEnabled(.podcasts) {
-                    Button {
-                        openMusicRoute(
-                            .podcast(podcast.podcastSummary)
-                        )
-                    } label: {
-                        Label(
-                            L10n.format("ui.podcasts.go_to", podcast.radioName),
-                            systemImage: "mic"
-                        )
-                    }
-                }
-            } else {
-                ControlGroup {
-                    Button {
-                        presentedSheet = .addToPlaylist(song)
-                    } label: {
-                        Label(
-                            "ui.playlists.add_to",
-                            systemImage: "plus.circle"
-                        )
-                    }
-                    Button {
-                        library.toggle(song: song)
-                    } label: {
-                        Label(
-                            library.contains(song: song)
-                                ? L10n.string("ui.common.unfavorite")
-                                : L10n.string("ui.common.favorite"),
-                            systemImage: library.contains(song: song)
-                                ? "star.fill"
-                                : "star"
-                        )
-                    }
-                    Menu {
-                        NeteaseShareMenuContent(resource: .song(song))
-                    } label: {
-                        Label("ui.common.share", systemImage: "square.and.arrow.up")
-                    }
-                }
-                Button {
-                    presentedSheet = .comments(song)
-                } label: {
-                    Label(
-                        "ui.comments.view",
-                        systemImage: "bubble.left.and.bubble.right"
+                        "ui.playlists.add_to",
+                        systemImage: "plus.circle"
                     )
                 }
                 Button {
-                    presentedSheet = .listenTogether
+                    library.toggle(song: song)
                 } label: {
                     Label(
-                        listenTogether.isInRoom
-                            ? L10n.string("ui.listen_together.room")
-                            : L10n.string("ui.listen_together.start"),
-                        systemImage: "person.2.wave.2"
+                        library.contains(song: song)
+                            ? L10n.string("ui.common.unfavorite")
+                            : L10n.string("ui.common.favorite"),
+                        systemImage: library.contains(song: song)
+                            ? "star.fill"
+                            : "star"
                     )
                 }
+                Menu {
+                    NeteaseShareMenuContent(resource: .song(song))
+                } label: {
+                    Label("ui.common.share", systemImage: "square.and.arrow.up")
+                }
+            }
+            Button {
+                presentedSheet = .comments(song)
+            } label: {
+                Label(
+                    "ui.comments.view",
+                    systemImage: "bubble.left.and.bubble.right"
+                )
+            }
 
-                Divider()
+            Divider()
+            Button {
+                player.addToPlaybackQueue(song)
+            } label: {
+                Label(
+                    "ui.player.add_to_queue",
+                    systemImage: "text.badge.plus"
+                )
+            }
+
+            Divider()
+            if let album = song.album {
                 Button {
-                    player.addToPlaybackQueue(song)
+                    openMusicRoute(.album(album))
                 } label: {
                     Label(
-                        "ui.player.add_to_queue",
-                        systemImage: "text.badge.plus"
+                        L10n.format("ui.album.go_to", album.name),
+                        systemImage: "music.note.list"
                     )
                 }
-
-                Divider()
-                if let album = song.album {
-                    Button {
-                        openMusicRoute(.album(album))
-                    } label: {
-                        Label(
-                            L10n.format("ui.album.go_to", album.name),
-                            systemImage: "music.note.list"
-                        )
-                    }
+            }
+            if let artist = song.artists.first, song.artists.count == 1 {
+                Button {
+                    openMusicRoute(.artist(artist))
+                } label: {
+                    Label(
+                        L10n.format("ui.artist.go_to", artist.name),
+                        systemImage: "music.microphone"
+                    )
                 }
-                if let artist = song.artists.first, song.artists.count == 1 {
-                    Button {
-                        openMusicRoute(.artist(artist))
-                    } label: {
-                        Label(
-                            L10n.format("ui.artist.go_to", artist.name),
-                            systemImage: "music.microphone"
-                        )
-                    }
-                } else if !song.artists.isEmpty {
-                    Menu {
-                        ForEach(song.artists) { artist in
-                            Button {
-                                openMusicRoute(.artist(artist))
-                            } label: {
-                                Text(artist.name)
-                            }
+            } else if !song.artists.isEmpty {
+                Menu {
+                    ForEach(song.artists) { artist in
+                        Button {
+                            openMusicRoute(.artist(artist))
+                        } label: {
+                            Text(artist.name)
                         }
-                    } label: {
-                        Label("ui.artist.go_to_generic", systemImage: "music.microphone")
                     }
+                } label: {
+                    Label("ui.artist.go_to_generic", systemImage: "music.microphone")
                 }
-                if settings.beatNetDebugEnabled {
-                    Divider()
-                    Button {
-                        presentedSheet = .beatNetDebug
-                    } label: {
-                        Label(
-                            "ui.beatnet.debug.title",
-                            systemImage: "waveform.path.ecg"
-                        )
-                    }
+            }
+            if settings.beatNetDebugEnabled {
+                Divider()
+                Button {
+                    presentedSheet = .beatNetDebug
+                } label: {
+                    Label(
+                        "ui.beatnet.debug.title",
+                        systemImage: "waveform.path.ecg"
+                    )
                 }
             }
         } label: {
@@ -240,7 +202,6 @@ struct NowPlayingSongActions: View {
 private enum NowPlayingSongSheet: Identifiable {
     case addToPlaylist(Song)
     case comments(Song)
-    case listenTogether
     case sleepTimer
     case beatNetDebug
     var id: String {
@@ -249,8 +210,6 @@ private enum NowPlayingSongSheet: Identifiable {
             "add-to-playlist-\(song.id)"
         case .comments(let song):
             "comments-\(song.id)"
-        case .listenTogether:
-            "listen-together"
         case .sleepTimer:
             "sleep-timer"
         case .beatNetDebug:

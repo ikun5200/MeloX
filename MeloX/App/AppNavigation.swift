@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PlaylistRouteContext: Hashable {
     let id: Int
+    let dirid: Int
     let name: String
     let coverURLString: String?
     let playlistDescription: String?
@@ -15,6 +16,7 @@ struct PlaylistRouteContext: Hashable {
 
     init(_ playlist: Playlist) {
         id = playlist.id
+        dirid = playlist.dirid
         name = playlist.name
         coverURLString = playlist.coverURLString
         playlistDescription = playlist.playlistDescription
@@ -39,7 +41,8 @@ struct PlaylistRouteContext: Hashable {
             toplistType: toplistType,
             copywriter: copywriter,
             creator: creator,
-            subscribed: subscribed
+            subscribed: subscribed,
+            dirid: dirid
         )
     }
 }
@@ -89,10 +92,6 @@ enum MusicRoute: Hashable {
     case playlistCategory(String)
     case album(AlbumRouteContext)
     case artist(Artist)
-    case podcasts
-    case podcast(Podcast)
-    case podcastCategory(PodcastCategory)
-    case podcastProgram(PodcastProgram)
     case dailySongs
     case newAlbums
     case toplists
@@ -114,10 +113,6 @@ enum MusicRoute: Hashable {
         case .song, .playlist, .toplist, .album, .artist:
             true
         case .playlistCategory,
-             .podcasts,
-             .podcast,
-             .podcastCategory,
-             .podcastProgram,
              .dailySongs,
              .newAlbums,
              .toplists:
@@ -139,14 +134,6 @@ enum MusicRoute: Hashable {
             "album-\(context.id)"
         case .artist(let artist):
             "artist-\(artist.id)-\(artist.mid)"
-        case .podcasts:
-            "podcasts"
-        case .podcast(let podcast):
-            "podcast-\(podcast.id)"
-        case .podcastCategory(let category):
-            "podcast-category-\(category.id)"
-        case .podcastProgram(let program):
-            "podcast-program-\(program.id)"
         case .dailySongs:
             "daily-songs"
         case .newAlbums:
@@ -162,15 +149,9 @@ enum MusicRoute: Hashable {
             context.coverURLString.flatMap(URL.init(string:))
         case .album(let context):
             context.picURL.flatMap(URL.init(string:))
-        case .podcast(let podcast):
-            podcast.artworkURL
-        case .podcastProgram(let program):
-            program.artworkURL
         case .song,
              .artist,
              .playlistCategory,
-             .podcasts,
-             .podcastCategory,
              .dailySongs,
              .newAlbums,
              .toplists:
@@ -270,14 +251,6 @@ private struct MusicRouteDestination: View {
             AlbumDetailView(context: context)
         case .artist(let artist):
             ArtistDetailView(artist: artist)
-        case .podcasts:
-            PodcastHomeView()
-        case .podcast(let podcast):
-            PodcastDetailView(podcast: podcast)
-        case .podcastCategory(let category):
-            PodcastCategoryView(category: category)
-        case .podcastProgram(let program):
-            PodcastProgramDetailView(program: program)
         case .dailySongs:
             DailySongsView()
         case .newAlbums:

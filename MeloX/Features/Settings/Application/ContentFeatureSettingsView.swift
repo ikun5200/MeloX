@@ -70,8 +70,7 @@ struct ContentFeatureSettingsView: View {
                     isEnabled: isEnabled
                 )
                 guard isEnabled,
-                      feature == .podcasts
-                        || feature == .listeningHistory else {
+                      feature == .listeningHistory else {
                     return
                 }
                 Task { await library.refresh(force: true) }

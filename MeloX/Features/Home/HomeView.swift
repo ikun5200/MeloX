@@ -73,8 +73,6 @@ struct HomeView: View {
             HomeRecommendedView()
         case .music:
             ExploreView(showsNavigationTitle: false)
-        case .podcasts:
-            PodcastHomeView(showsNavigationTitle: false)
         case .explore:
             ExploreView(showsNavigationTitle: false)
         case .library:
@@ -83,9 +81,7 @@ struct HomeView: View {
              .libraryPlaylists,
              .libraryAlbums,
              .libraryArtists,
-             .libraryPodcasts,
              .libraryDownloads,
-             .libraryCloud,
              .libraryHistory:
             if let page = section.libraryPage {
                 LibraryView(

@@ -718,9 +718,9 @@ final class AppSettings {
     }
 
     func resetTabLayout() {
-        separatedLibraryPages = [.cloud]
+        separatedLibraryPages = []
         homeTabOrder = Self.normalizedHomeTabOrder(
-            [.recommended, .music, .podcasts],
+            [.recommended, .music, .library],
             separatedLibraryPages: separatedLibraryPages
         )
         tabOrder = Self.normalizedTabOrder(
@@ -1456,7 +1456,7 @@ final class AppSettings {
             defaults.array(forKey: Key.separatedLibraryPages) as? [String]
         )?.compactMap(LibraryPage.init(rawValue:))
         let normalizedSeparatedPages = Self.normalizedLibraryPages(
-            storedSeparatedPages ?? [.cloud]
+            storedSeparatedPages ?? []
         )
         separatedLibraryPages = normalizedSeparatedPages
         let storedHomeTabOrder = (
@@ -1464,7 +1464,7 @@ final class AppSettings {
         )?.compactMap(AppTab.init(rawValue:))
         let normalizedHomeTabOrder = Self.normalizedHomeTabOrder(
             storedHomeTabOrder
-                ?? [.recommended, .music, .podcasts],
+                ?? [.recommended, .music, .library],
             separatedLibraryPages: normalizedSeparatedPages
         )
         homeTabOrder = normalizedHomeTabOrder

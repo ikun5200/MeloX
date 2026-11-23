@@ -77,16 +77,7 @@ struct GeneralSettingsView: View {
             }
 
             Section {
-                Toggle(
-                    "ui.settings.general.clipboard_recognition",
-                    isOn: $settings.recognizesClipboardLinksOnLaunch
-                )
-            } header: {
-                Text("ui.settings.general.clipboard.section")
-            } footer: {
-                Text(
-                    "ui.settings.general.clipboard.footer"
-                )
+                EmptyView()
             }
 
             Section("ui.navigation.search") {

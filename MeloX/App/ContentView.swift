@@ -32,8 +32,6 @@ struct ContentView: View {
     )
     @State private var presentedSheet: ContentSheet?
     @State private var playerPresentation: PlayerPresentation?
-    @State private var neteaseSharePresentation: NeteaseSharePresentation?
-    @State private var nowPlayingSharePresentation: NeteaseSharePresentation?
     @State private var pendingMusicRoute: MusicRoute?
     @State private var isTabViewBottomAccessorySuppressed = false
     @State private var hasRestoredPlayback = false
@@ -72,10 +70,6 @@ struct ContentView: View {
                 OpenMusicRouteAction(action: openMusicRoute)
             )
             .environment(
-                \.openNeteaseShare,
-                OpenNeteaseShareAction(action: openNeteaseShare)
-            )
-            .environment(
                 \.setTabViewBottomAccessorySuppressed,
                 SetTabViewBottomAccessorySuppressedAction {
                     isTabViewBottomAccessorySuppressed = $0
@@ -92,19 +86,6 @@ struct ContentView: View {
                             \.openMusicRoute,
                             OpenMusicRouteAction(action: openMusicRoute)
                         )
-                        .environment(
-                            \.openNeteaseShare,
-                            OpenNeteaseShareAction { presentation in
-                                presentNeteaseShare(
-                                    presentation,
-                                    fromNowPlaying: true
-                                )
-                            }
-                        )
-                        .sheet(item: $nowPlayingSharePresentation) {
-                            presentation in
-                            NeteaseShareSheet(presentation: presentation)
-                        }
                         .presentationBackground(.clear)
                         .presentationContentInteraction(.resizes)
                         .navigationTransition(
@@ -114,9 +95,6 @@ struct ContentView: View {
                             )
                         )
                 }
-            }
-            .sheet(item: $neteaseSharePresentation) { presentation in
-                NeteaseShareSheet(presentation: presentation)
             }
             .sheet(item: $presentedSheet) { destination in
                 switch destination {
@@ -296,9 +274,6 @@ struct ContentView: View {
                 )
             }
             .coordinateListenTogether()
-            .recognizesClipboardLinksOnLaunch { song in
-                openMusicRoute(.song(song))
-            }
             .appLaunchExperience()
     }
 
@@ -504,9 +479,7 @@ struct ContentView: View {
                 .navigationTitle("ui.navigation.recommended")
                 .navigationBarTitleDisplayMode(.large)
         case .music:
-            ExploreView(navigationTitle: L10n.string("ui.navigation.music"))
-        case .podcasts:
-            PodcastHomeView()
+            ExploreView()
         case .explore:
             ExploreView()
         case .library:
@@ -517,10 +490,9 @@ struct ContentView: View {
              .libraryPlaylists,
              .libraryAlbums,
              .libraryArtists,
-             .libraryPodcasts,
              .libraryDownloads,
-             .libraryCloud,
              .libraryHistory:
+
             if let page = tab.libraryPage {
                 LibraryView(fixedPage: page)
             }
@@ -602,28 +574,6 @@ struct ContentView: View {
             return
         }
         navigate(to: route)
-    }
-
-    private func openNeteaseShare(
-        _ presentation: NeteaseSharePresentation
-    ) {
-        presentNeteaseShare(presentation, fromNowPlaying: false)
-    }
-
-    private func presentNeteaseShare(
-        _ presentation: NeteaseSharePresentation,
-        fromNowPlaying: Bool
-    ) {
-        Task { @MainActor in
-            // Menu actions can fire before the system has completed
-            // dismissing the menu. Present on the next settled UI turn.
-            try? await Task.sleep(for: .milliseconds(140))
-            if fromNowPlaying {
-                nowPlayingSharePresentation = presentation
-            } else {
-                neteaseSharePresentation = presentation
-            }
-        }
     }
 
     private func finishPendingSongNavigation() {

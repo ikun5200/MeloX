@@ -9,7 +9,6 @@ struct MeloXApp: App {
     @State private var api: NeteaseAPI
     @State private var sourceStore: LXSourceStore
     @State private var library: LibraryStore
-    @State private var cloud: CloudMusicStore
     @State private var downloads: DownloadStore
     @State private var player: PlayerStore
     @State private var phoneWatchSync: PhoneWatchSyncService
@@ -46,7 +45,6 @@ struct MeloXApp: App {
             resolver: resolver
         )
         let library = LibraryStore(api: api, settings: settings)
-        let cloud = CloudMusicStore(api: api, settings: settings)
         let downloads = DownloadStore(api: api, settings: settings)
         let lyricsNotifications = LyricsNotificationController(
             preferences: settings.lyricsNotifications
@@ -78,7 +76,6 @@ struct MeloXApp: App {
         _api = State(initialValue: api)
         _sourceStore = State(initialValue: sourceStore)
         _library = State(initialValue: library)
-        _cloud = State(initialValue: cloud)
         _downloads = State(initialValue: downloads)
         _player = State(initialValue: player)
         _phoneWatchSync = State(initialValue: phoneWatchSync)
@@ -99,7 +96,6 @@ struct MeloXApp: App {
                 .environment(api)
                 .environment(sourceStore)
                 .environment(library)
-                .environment(cloud)
                 .environment(downloads)
                 .environment(player)
                 .environment(listenTogether)

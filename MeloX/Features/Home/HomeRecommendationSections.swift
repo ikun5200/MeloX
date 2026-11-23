@@ -11,8 +11,8 @@ struct HomeRecommendationSectionView: View {
             playlistSection(playlists)
         case .songs(let songs):
             songSection(songs)
-        case .podcastPrograms(let programs):
-            podcastSection(programs)
+        case .podcastPrograms:
+            EmptyView()
         }
     }
 
@@ -47,24 +47,6 @@ struct HomeRecommendationSectionView: View {
                     HomeSongCard(song: song)
                 }
                 .buttonStyle(.plain)
-            }
-        }
-    }
-
-    private func podcastSection(
-        _ programs: [PodcastProgram]
-    ) -> some View {
-        HomeMediaStrip(title: section.title) {
-            ForEach(programs) { program in
-                NavigationLink(
-                    value: MusicRoute.podcastProgram(program)
-                ) {
-                    HomePodcastProgramCard(program: program)
-                }
-                .buttonStyle(.plain)
-                .musicMatchedTransitionSource(
-                    for: MusicRoute.podcastProgram(program)
-                )
             }
         }
     }

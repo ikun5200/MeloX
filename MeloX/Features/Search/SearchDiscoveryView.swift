@@ -157,16 +157,12 @@ private struct SearchMusicCategory: Identifiable {
         L10n.string(localizationKey)
     }
 
-    var requiredContentFeature: ContentFeature? {
-        localizationKey == "ui.navigation.podcasts" ? .podcasts : nil
-    }
+    var requiredContentFeature: ContentFeature? { nil }
 
     var route: MusicRoute {
         switch requestName {
         case "排行榜":
             .toplists
-        case "播客":
-            .podcasts
         default:
             .playlistCategory(requestName)
         }
@@ -174,7 +170,6 @@ private struct SearchMusicCategory: Identifiable {
 
     static let all: [SearchMusicCategory] = [
         .init(requestName: "排行榜", localizationKey: "ui.category.toplists", systemImage: "chart.bar.fill", colors: [.orange, .red]),
-        .init(requestName: "播客", localizationKey: "ui.navigation.podcasts", systemImage: "mic.fill", colors: [.purple, .indigo]),
         .init(requestName: "华语", localizationKey: "ui.category.chinese", systemImage: "character.book.closed.fill", colors: [.pink, .red]),
         .init(requestName: "欧美", localizationKey: "ui.category.europe_america", systemImage: "globe.americas.fill", colors: [.blue, .indigo]),
         .init(requestName: "日语", localizationKey: "ui.category.japanese", systemImage: "sun.max.fill", colors: [.orange, .pink]),

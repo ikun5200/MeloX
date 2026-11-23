@@ -101,10 +101,8 @@ struct SearchView: View {
             guard completedRequest != request else { return }
             await search(request)
         }
-        .onChange(
-            of: settings.isContentFeatureEnabled(.podcasts)
-        ) { _, podcastsEnabled in
-            if !podcastsEnabled, scope == .podcasts {
+        .onChange(of: scope) { _, newScope in
+            if newScope == .podcasts {
                 scope = .songs
             }
         }
@@ -126,10 +124,7 @@ struct SearchView: View {
     }
 
     private var availableSearchKinds: [SearchKind] {
-        SearchKind.allCases.filter {
-            $0 != .podcasts
-                || settings.isContentFeatureEnabled(.podcasts)
-        }
+        SearchKind.allCases.filter { $0 != .podcasts }
     }
 
     private var searchResults: some View {
@@ -202,13 +197,7 @@ struct SearchView: View {
                     .musicMatchedTransitionSource(for: MusicRoute.playlist(playlist))
                 }
             case .podcasts:
-                ForEach(podcasts) { podcast in
-                    NavigationLink(
-                        value: MusicRoute.podcast(podcast)
-                    ) {
-                        PodcastListRow(podcast: podcast)
-                    }
-                }
+                EmptyView()
             }
         }
         .listStyle(.plain)

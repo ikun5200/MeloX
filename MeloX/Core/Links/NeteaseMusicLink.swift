@@ -23,29 +23,7 @@ enum NeteaseMusicLink: Hashable, Identifiable {
 
 enum NeteaseMusicLinkParser {
     static func parse(_ text: String) -> NeteaseMusicLink? {
-        let trimmed = text.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
-        guard !trimmed.isEmpty else { return nil }
-
-        for url in detectedURLs(in: trimmed) where isNeteaseURL(url) {
-            if isListenTogetherURL(url),
-               let invitation = try? ListenTogetherInvitation(
-                   text: url.absoluteString
-               ) {
-                return .listenTogether(
-                    NeteaseListenTogetherLink(
-                        invitationText: trimmed,
-                        roomID: invitation.roomID
-                    )
-                )
-            }
-
-            if let songID = songID(from: url) {
-                return .song(id: songID)
-            }
-        }
-
+        // QQ 音乐模式不再识别网易云深链；QQ 分享链接解析留待后续实现。
         return nil
     }
 
