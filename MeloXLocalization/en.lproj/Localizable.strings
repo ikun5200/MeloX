@@ -188,7 +188,7 @@
 "ui.podcast.sort.newest" = "Newest First";
 "ui.podcast.sort.oldest" = "Oldest First";
 
-"ui.error.api.request_encoding" = "Could not create the NetEase Cloud Music request.";
+"ui.error.api.request_encoding" = "Could not create the QQ Music request.";
 "ui.error.api.invalid_response" = "The music service returned data MeloX could not recognize.";
 "ui.error.api.empty_response" = "The music service returned an empty response (%ld).";
 "ui.error.api.server" = "Request failed (%ld): %@";
@@ -199,7 +199,7 @@
 "ui.error.api.decode" = "Could not decode %ld bytes (%@): %@";
 "ui.error.update.no_release" = "This repository has no published release yet.";
 "ui.error.update.invalid_release" = "The release information is incomplete.";
-"ui.error.heart_mode.no_playable_song" = "NetEase Cloud Music did not return a playable Heart Mode song.";
+"ui.error.heart_mode.no_playable_song" = "QQ Music did not return a playable Heart Mode song.";
 "ui.error.home.load_failed" = "Could not load Home recommendations.";
 "ui.error.private_radio.start_failed" = "Could not start Personal FM.";
 "ui.error.song_wiki.load_failed" = "Could not load song details.";
@@ -587,7 +587,7 @@
 "ui.settings.playback.remember_page" = "Remember Player Page";
 "ui.settings.playback.previous_restarts" = "Previous Button Restarts Current Song";
 "ui.settings.playback.section.behavior" = "Playback Behavior";
-"ui.settings.playback.behavior.footer" = "Starting in Heart Mode requires a NetEase Cloud Music account. On the next launch, My Favorite Music will load and begin playing. Page memory restores the last artwork, lyrics, or queue page. When previous-button restart is enabled, tapping Previous after 5 seconds restarts the current song first.";
+"ui.settings.playback.behavior.footer" = "Starting in Heart Mode requires a QQ Music account. On the next launch, My Favorite Music will load and begin playing. Page memory restores the last artwork, lyrics, or queue page. When previous-button restart is enabled, tapping Previous after 5 seconds restarts the current song first.";
 "ui.settings.automix.title" = "AutoMix";
 "ui.settings.automix.enabled" = "AutoMix";
 "ui.settings.automix.transition_mode" = "Transition Mode";
@@ -766,7 +766,7 @@
 "ui.settings.lyrics.content.amll_source" = "AMLL TTML Lyrics";
 "ui.settings.lyrics.content.qq_source" = "QQ Music Lyrics Supplement";
 "ui.settings.lyrics.content.section.source" = "Lyrics Sources";
-"ui.settings.lyrics.content.source.footer" = "Automatic selection displays NetEase lyrics first, then waits for AMLL and QQ Music before choosing in this order: AMLL TTML, NetEase YRC, QQ QRC, NetEase LRC, and QQ LRC. Selecting a source manually uses only that source; you can switch again from the player menu at any time.";
+"ui.settings.lyrics.content.source.footer" = "In QQ Music mode, MeloX uses QQ Music QRC word-by-word lyrics and LRC lyrics, synchronized with playback.";
 "ui.settings.lyrics.content.duet_layout" = "Split Duet Lyrics";
 "ui.settings.lyrics.content.section.performer_layout" = "Performer Layout";
 "ui.settings.lyrics.content.duet_layout.footer" = "Uses performer markers in the lyrics to align different singers left and right. Group vocals remain left-aligned.";
@@ -866,7 +866,7 @@
 "ui.settings.storage.delete_all_downloads" = "Delete All Downloads";
 "ui.settings.storage.delete_all_downloads.subtitle" = "Also cancels active download tasks";
 "ui.settings.storage.section.destructive" = "Destructive Actions";
-"ui.settings.storage.destructive.footer" = "Deleted song files cannot be recovered, but favorites and playlists in NetEase Cloud Music are unaffected.";
+"ui.settings.storage.destructive.footer" = "Deleted song files cannot be recovered, but favorites and playlists in QQ Music are unaffected.";
 "ui.settings.storage.operation.cleared_approximately" = "Cleared approximately %@";
 "ui.settings.storage.operation.cleared_network_cache" = "Cleared %@ of network and artwork cache";
 "ui.settings.storage.operation.cleared_temporary_files" = "Cleared %@ of temporary files";

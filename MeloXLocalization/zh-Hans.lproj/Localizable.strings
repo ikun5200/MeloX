@@ -188,7 +188,7 @@
 "ui.podcast.sort.newest" = "最新优先";
 "ui.podcast.sort.oldest" = "最早优先";
 
-"ui.error.api.request_encoding" = "无法生成网易云音乐请求。";
+"ui.error.api.request_encoding" = "无法生成 QQ 音乐请求。";
 "ui.error.api.invalid_response" = "音乐服务返回了无法识别的数据。";
 "ui.error.api.empty_response" = "音乐服务返回了空响应（%ld）。";
 "ui.error.api.server" = "请求失败（%ld）：%@";
@@ -199,7 +199,7 @@
 "ui.error.api.decode" = "数据解析失败（%ld 字节）：%@；%@";
 "ui.error.update.no_release" = "当前仓库还没有发布版本。";
 "ui.error.update.invalid_release" = "发布信息格式不完整。";
-"ui.error.heart_mode.no_playable_song" = "网易云音乐暂时没有返回可播放的心动模式歌曲。";
+"ui.error.heart_mode.no_playable_song" = "QQ 音乐暂时没有返回可播放的心动模式歌曲。";
 "ui.error.home.load_failed" = "无法载入首页推荐。";
 "ui.error.private_radio.start_failed" = "无法开始私人漫游。";
 "ui.error.song_wiki.load_failed" = "无法载入歌曲百科。";
@@ -587,7 +587,7 @@
 "ui.settings.playback.remember_page" = "记住播放器页面";
 "ui.settings.playback.previous_restarts" = "上一首优先回到歌曲开头";
 "ui.settings.playback.section.behavior" = "播放行为";
-"ui.settings.playback.behavior.footer" = "自动心动模式需要登录网易云音乐；开启后会在下次启动时载入“我喜欢的音乐”并开始播放。页面记忆会恢复上次停留的封面、歌词或队列。开启“上一首优先回到歌曲开头”后，播放超过 5 秒会先回到本曲开头。";
+"ui.settings.playback.behavior.footer" = "自动心动模式需要登录 QQ 音乐；开启后会在下次启动时载入“我喜欢的音乐”并开始播放。页面记忆会恢复上次停留的封面、歌词或队列。开启“上一首优先回到歌曲开头”后，播放超过 5 秒会先回到本曲开头。";
 "ui.settings.automix.title" = "自动混音";
 "ui.settings.automix.enabled" = "自动混音";
 "ui.settings.automix.transition_mode" = "过渡方式";
@@ -766,7 +766,7 @@
 "ui.settings.lyrics.content.amll_source" = "AMLL TTML 歌词";
 "ui.settings.lyrics.content.qq_source" = "QQ 音乐歌词补全";
 "ui.settings.lyrics.content.section.source" = "歌词来源";
-"ui.settings.lyrics.content.source.footer" = "自动优选会先加载并显示网易云歌词，等待 AMLL 与 QQ 音乐返回后再按 AMLL TTML、网易云 YRC、QQ QRC、网易云 LRC、QQ LRC 的顺序统一优选。手动选择某个来源后，将仅使用该来源；也可以随时在播放器菜单中切换。";
+"ui.settings.lyrics.content.source.footer" = "QQ 音乐模式下使用 QQ 音乐的 QRC 逐字歌词与 LRC 歌词。歌词会随播放进度同步显示。";
 "ui.settings.lyrics.content.duet_layout" = "双人歌词分列显示";
 "ui.settings.lyrics.content.section.performer_layout" = "演唱者布局";
 "ui.settings.lyrics.content.duet_layout.footer" = "根据歌词中的演唱者标记，将不同演唱者分别靠左、靠右显示；合唱保持靠左。";
@@ -866,7 +866,7 @@
 "ui.settings.storage.delete_all_downloads" = "删除所有下载";
 "ui.settings.storage.delete_all_downloads.subtitle" = "同时取消正在进行的下载任务";
 "ui.settings.storage.section.destructive" = "危险操作";
-"ui.settings.storage.destructive.footer" = "删除的歌曲文件无法恢复，但不会影响网易云音乐中的收藏和歌单。";
+"ui.settings.storage.destructive.footer" = "删除的歌曲文件无法恢复，但不会影响 QQ 音乐中的收藏和歌单。";
 "ui.settings.storage.operation.cleared_approximately" = "已清理约 %@";
 "ui.settings.storage.operation.cleared_network_cache" = "已清理 %@ 网络与图片缓存";
 "ui.settings.storage.operation.cleared_temporary_files" = "已清理 %@ 临时文件";
