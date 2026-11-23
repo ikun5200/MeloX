@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCES = [
     "MeloX/Core/Backend/QQ/QQMusicSign.swift",
     "MeloX/Core/Backend/QQ/QQMusicSearchModels.swift",
+    "MeloX/Core/Links/QQMusicLink.swift",
     "MeloX/Core/Settings/Playback/MusicQuality.swift",
     "MeloX/Core/Sources/LXQualityMapping.swift",
 ]
@@ -154,6 +155,31 @@ struct Harness {
         precondition(parsedPlaylist.dirid == 789)
         precondition(parsedPlaylist.trackCount == 12)
         precondition(parsedPlaylist.creatorName == "创建者")
+
+        precondition(
+            QQMusicLinkParser.parse(
+                "https://y.qq.com/n/ryqq/songDetail/0039MnYb0qxYhV"
+            ) == .song(mid: "0039MnYb0qxYhV")
+        )
+        precondition(
+            QQMusicLinkParser.parse(
+                "https://y.qq.com/n/ryqq/albumDetail/0024bjiL2aocxT"
+            ) == .album(mid: "0024bjiL2aocxT")
+        )
+        precondition(
+            QQMusicLinkParser.parse(
+                "https://y.qq.com/n/ryqq/playlist/7011264340"
+            ) == .playlist(id: 7_011_264_340)
+        )
+        precondition(
+            QQMusicLinkParser.parse(
+                "https://y.qq.com/n/ryqq/toplist/26"
+            ) == .toplist(id: 26)
+        )
+        precondition(
+            QQMusicLinkParser.parse("https://example.com/songDetail/x")
+                == nil
+        )
     }
 }
 """

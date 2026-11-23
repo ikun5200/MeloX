@@ -1062,6 +1062,7 @@
 "ui.error.favorite_failed" = "Favorite Operation Failed";
 "ui.search.searching" = "Searching";
 "ui.search.reading_song_link" = "Reading Song Link";
+"ui.search.link_unsupported" = "This QQ Music link type is not supported yet. Paste a song link instead.";
 "ui.search.section.linked_song" = "Song from Link";
 "ui.listen_together.invitation" = "Listen Together Invitation";
 "ui.search.listen_together_link_recognized" = "A NetEase Cloud Music Listen Together share link was recognized.";

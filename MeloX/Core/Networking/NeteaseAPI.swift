@@ -349,6 +349,14 @@ final class NeteaseAPI {
         return try await qq.mvPlayback(vid: vid)
     }
 
+    func songDetail(mid: String) async throws -> Song? {
+        guard isUsingSourceResolver else { return nil }
+        guard let song = try await qq.songDetail(mid: mid) else {
+            return nil
+        }
+        return QQMusicMapper.song(song)
+    }
+
     func songDetails(ids: [Int]) async throws -> [Song] {
         guard !ids.isEmpty else { return [] }
         if isUsingSourceResolver {

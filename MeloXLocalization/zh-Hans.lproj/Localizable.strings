@@ -1062,6 +1062,7 @@
 "ui.error.favorite_failed" = "收藏失败";
 "ui.search.searching" = "搜索中";
 "ui.search.reading_song_link" = "正在读取歌曲链接";
+"ui.search.link_unsupported" = "暂不支持此类型的 QQ 音乐链接，请粘贴歌曲链接。";
 "ui.search.section.linked_song" = "链接中的歌曲";
 "ui.listen_together.invitation" = "一起听邀请";
 "ui.search.listen_together_link_recognized" = "已识别网易云音乐一起听分享链接。";

@@ -19,6 +19,7 @@ struct SearchView: View {
     @State private var completedRequest: SearchRequest?
     @State private var recognizedLink: NeteaseMusicLink?
     @State private var linkedSong: Song?
+    @State private var linkedQQSong: Song?
     @State private var presentedListenTogetherLink:
         NeteaseListenTogetherLink?
 
@@ -28,6 +29,8 @@ struct SearchView: View {
                 SearchDiscoveryView()
             } else if let recognizedLink {
                 linkResult(for: recognizedLink)
+            } else if let linkedQQSong {
+                qqLinkResult(song: linkedQQSong)
             } else {
                 searchResults
             }
@@ -267,8 +270,14 @@ struct SearchView: View {
             resultCache.clear()
             recognizedLink = nil
             linkedSong = nil
+            linkedQQSong = nil
             phase = .loaded
             completedRequest = request
+            return
+        }
+
+        if let qqLink = QQMusicLinkParser.parse(keywords) {
+            await resolveQQ(qqLink, for: request)
             return
         }
 
@@ -279,6 +288,7 @@ struct SearchView: View {
 
         recognizedLink = nil
         linkedSong = nil
+        linkedQQSong = nil
         if let cached = resultCache.value(for: keywords, kind: request.kind) {
             apply(cached)
             phase = .loaded
@@ -321,6 +331,54 @@ struct SearchView: View {
         artists = result.artists ?? []
         playlists = result.playlists ?? []
         podcasts = result.podcasts ?? []
+    }
+
+    private func qqLinkResult(song: Song) -> some View {
+        List {
+            Section("ui.search.section.linked_song") {
+                NavigationLink(value: MusicRoute.song(song)) {
+                    TrackRowView(song: song, showsArtwork: true)
+                }
+                .musicMatchedTransitionSource(
+                    for: MusicRoute.song(song)
+                )
+            }
+        }
+        .listStyle(.plain)
+    }
+
+    private func resolveQQ(
+        _ link: QQMusicLink,
+        for request: SearchRequest
+    ) async {
+        recognizedLink = nil
+        linkedSong = nil
+        linkedQQSong = nil
+        clearResults()
+
+        switch link {
+        case .song(let mid):
+            phase = .loading
+            do {
+                guard let song = try await api.songDetail(mid: mid) else {
+                    phase = .failed(
+                        L10n.string("ui.clipboard.error.song_not_found")
+                    )
+                    return
+                }
+                linkedQQSong = song
+                phase = .loaded
+                completedRequest = request
+            } catch is CancellationError {
+                return
+            } catch {
+                phase = .failed(error.localizedDescription)
+            }
+        case .album, .playlist, .toplist:
+            phase = .failed(
+                L10n.string("ui.search.link_unsupported")
+            )
+        }
     }
 
     private func resolve(

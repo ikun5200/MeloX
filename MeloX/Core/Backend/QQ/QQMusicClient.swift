@@ -490,6 +490,20 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
 
     // MARK: - Song details
 
+    func songDetail(mid: String) async throws -> QQSearchSong? {
+        let trimmed = mid.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let data = try await cgiCall(
+            module: "music.pf_song_detail_svr",
+            method: "get_song_detail_yqq",
+            parameter: ["song_mid": trimmed]
+        )
+        guard let track = Self.dictionary(data["track_info"]) else {
+            return nil
+        }
+        return QQMusicSearchParser.song(track)
+    }
+
     func songDetails(ids: [Int]) async throws -> [QQSearchSong] {
         guard !ids.isEmpty else { return [] }
         var songs: [QQSearchSong] = []
