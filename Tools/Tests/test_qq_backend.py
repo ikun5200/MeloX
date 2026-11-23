@@ -230,5 +230,119 @@ class QQBackendChecks(unittest.TestCase):
             )
 
 
+class LXScriptRuntimeChecks(unittest.TestCase):
+    def test_fake_source_initializes_and_resolves(self):
+        fake_script = r"""
+lx.on(lx.EVENT_NAMES.request, function (request) {
+    if (request.action === 'musicUrl'
+        && request.source === 'tx'
+        && request.info.type === '128k') {
+        return 'https://example.com/a.mp3';
+    }
+    return Promise.reject(new Error('unsupported quality'));
+});
+lx.send(lx.EVENT_NAMES.inited, {
+    sources: {
+        tx: {
+            name: 'TX',
+            type: 'music',
+            actions: ['musicUrl'],
+            qualitys: ['128k', '320k']
+        }
+    }
+});
+"""
+        harness = r"""
+import Foundation
+
+@main
+struct RuntimeHarness {
+    static func main() async {
+        do {
+            let preload = try String(
+                contentsOfFile: CommandLine.arguments[1],
+                encoding: .utf8
+            )
+            let runtime = LXScriptRuntime(preload: preload)
+            let script = try String(
+                contentsOfFile: CommandLine.arguments[2],
+                encoding: .utf8
+            )
+            let descriptor = try await runtime.initialize(
+                script: script
+            )
+            guard let tx = descriptor.qqSource else {
+                preconditionFailure("tx source missing")
+            }
+            precondition(tx.qualitys == ["128k", "320k"])
+            let url = try await runtime.resolveMusicURL(
+                musicInfo: ["songmid": "mid", "name": "song"],
+                quality: "128k"
+            )
+            precondition(url == "https://example.com/a.mp3")
+            do {
+                _ = try await runtime.resolveMusicURL(
+                    musicInfo: ["songmid": "mid"],
+                    quality: "flac"
+                )
+                preconditionFailure("unsupported quality should fail")
+            } catch {
+                // expected
+            }
+            runtime.shutdown()
+        } catch {
+            print("runtime error:", error)
+            exit(1)
+        }
+    }
+}
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            source = ROOT / "MeloX/Core/Sources/LXScriptRuntime.swift"
+            (work / source.name).write_text(
+                source.read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (work / "Harness.swift").write_text(harness, encoding="utf-8")
+            script_path = work / "fake-source.js"
+            script_path.write_text(fake_script, encoding="utf-8")
+            binary = work / "lx-checks"
+            compile_result = subprocess.run(
+                [
+                    "swiftc",
+                    "-O",
+                    "-o",
+                    str(binary),
+                    str(work / source.name),
+                    str(work / "Harness.swift"),
+                ],
+                cwd=work,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                compile_result.returncode,
+                0,
+                compile_result.stderr,
+            )
+            run_result = subprocess.run(
+                [
+                    str(binary),
+                    str(ROOT / "MeloX/Resources/LX/LXScriptPreload.js"),
+                    str(script_path),
+                ],
+                cwd=work,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            self.assertEqual(
+                run_result.returncode,
+                0,
+                run_result.stderr + run_result.stdout,
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
