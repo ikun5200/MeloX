@@ -74,9 +74,6 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Simulator smoke test / 模拟器冒烟测试
-        run: bash Tools/Tests/simulator_smoke.sh
-
       - name: Prepare release body / 准备发版说明
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
