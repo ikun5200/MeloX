@@ -76,6 +76,7 @@ struct AppleMusicLyricsView: View {
     let errorMessage: String?
     let highlightedLyricID: LyricLine.ID?
     let isActive: Bool
+    let isTransitioning: Bool
     let isInterfaceHidden: Bool
     let bottomOverlayHeight: CGFloat
     let focusAnchorOffset: CGFloat?
@@ -124,6 +125,7 @@ struct AppleMusicLyricsView: View {
         errorMessage: String?,
         highlightedLyricID: LyricLine.ID?,
         isActive: Bool = true,
+        isTransitioning: Bool = false,
         isInterfaceHidden: Bool = false,
         bottomOverlayHeight: CGFloat = 0,
         focusAnchorOffset: CGFloat? = nil,
@@ -135,6 +137,7 @@ struct AppleMusicLyricsView: View {
         self.errorMessage = errorMessage
         self.highlightedLyricID = highlightedLyricID
         self.isActive = isActive
+        self.isTransitioning = isTransitioning
         self.isInterfaceHidden = isInterfaceHidden
         self.bottomOverlayHeight = bottomOverlayHeight
         self.focusAnchorOffset = focusAnchorOffset
@@ -192,6 +195,12 @@ struct AppleMusicLyricsView: View {
                 guard isActive else {
                     settleMovementForInactivePage()
                     return
+                }
+                // Snap the lyrics into focus while the page is still
+                // moving; an animated focus cascade here competes with
+                // the artwork spring.
+                if isTransitioning {
+                    isPreparingInitialFocus = true
                 }
                 synchronizeInterfaceVisibility()
                 synchronizeFocusWithPlayback()
@@ -2030,7 +2039,7 @@ struct AppleMusicLyricsView: View {
         if let interlude = focusedInterlude {
             moveFocusToInterlude(
                 interlude,
-                animated: !isPreparingInitialFocus
+                animated: !isPreparingInitialFocus && !isTransitioning
             )
             return
         }
@@ -2091,7 +2100,7 @@ struct AppleMusicLyricsView: View {
             await ensureFocusAlignment(
                 to: highlightedLyricID,
                 viewportHeight: viewportHeight,
-                animated: !isPreparingInitialFocus
+                animated: !isPreparingInitialFocus && !isTransitioning
             )
             return
         }

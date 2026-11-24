@@ -732,6 +732,7 @@ struct NowPlayingView: View {
             errorMessage: lyricError,
             highlightedLyricID: highlightedLyricID,
             isActive: page == .lyrics,
+            isTransitioning: pageTransition.transition != nil,
             isInterfaceHidden: hidesLyricsControls,
             artworkNamespace: pageArtworkNamespace,
             usesArtworkTransition:

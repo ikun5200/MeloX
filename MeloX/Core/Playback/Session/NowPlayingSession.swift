@@ -62,8 +62,8 @@ final class NowPlayingSession {
             MPNowPlayingInfoPropertyIsLiveStream: false,
             MPNowPlayingInfoPropertyExternalContentIdentifier:
                 song.podcastMetadata.map {
-                    "qqmusic:djprogram:\($0.programID)"
-                } ?? "qqmusic:song:\(song.id)",
+                    "melox://now-playing?program=\($0.programID)"
+                } ?? "melox://now-playing?song=\(song.id)",
             MPNowPlayingInfoPropertyServiceIdentifier:
                 Bundle.main.bundleIdentifier
                     ?? "moye.MeloX",
