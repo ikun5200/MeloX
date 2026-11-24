@@ -239,6 +239,18 @@ final class FloatingLyricsController: NSObject {
     private func refreshFrame(force: Bool = false) {
         let presentation = makePresentation()
         guard force || presentation != lastPresentation else { return }
+        // Nobody sees the source layer until Picture in Picture starts, and
+        // starting it forces fresh frames. Until then only a change of line
+        // or song is worth an off-screen render on the main thread.
+        if !force,
+           !isActive,
+           let lastPresentation,
+           presentation.songID == lastPresentation.songID,
+           presentation.currentLine?.id == lastPresentation.currentLine?.id,
+           presentation.fallbackText == lastPresentation.fallbackText,
+           presentation.isPlaying == lastPresentation.isPlaying {
+            return
+        }
 
         let sampleBufferRenderer = prepareSampleBufferRenderer()
         guard sampleBufferRenderer.isReadyForMoreMediaData else {

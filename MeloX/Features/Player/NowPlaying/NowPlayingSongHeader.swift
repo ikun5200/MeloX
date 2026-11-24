@@ -182,7 +182,7 @@ struct NowPlayingLandscapeSongHeader: View {
                     .background(.white.opacity(0.13), in: .circle)
                     .contentShape(.circle)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.subtlePress)
                 .accessibilityLabel("ui.settings.skyline.title")
             }
 

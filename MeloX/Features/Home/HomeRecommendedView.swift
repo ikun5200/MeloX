@@ -130,11 +130,13 @@ struct HomeRecommendedView: View {
                             minHeight: 280
                         )
                         .padding(.horizontal)
+                        .transition(.opacity)
                 } else {
                     ForEach(feed.sections) { section in
                         HomeRecommendationSectionView(
                             section: section
                         )
+                        .transition(.opacity)
                     }
 
                     if feed.sections.isEmpty {
@@ -152,11 +154,13 @@ struct HomeRecommendedView: View {
                             minHeight: 280
                         )
                         .padding(.horizontal)
+                        .transition(.opacity)
                     }
                 }
             }
             .padding(.top, 8)
             .padding(.bottom, 28)
+            .animation(.easeOut(duration: 0.2), value: hasRecommendationPayload)
         }
         .refreshable {
             await load(refresh: true)

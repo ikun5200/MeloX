@@ -297,7 +297,7 @@ private struct NowPlayingQueueModeControls: View {
                 )
                 .contentShape(.rect(cornerRadius: 22))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.subtlePress)
         .disabled(!isEnabled)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint(
@@ -362,7 +362,12 @@ private struct NowPlayingQueueRow: View {
             }
             .contentShape(.rect)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(
+            SubtlePressButtonStyle(
+                pressedScale: 1,
+                pressedOpacity: 0.6
+            )
+        )
         .listRowInsets(
             .init(
                 top: 4,

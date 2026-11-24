@@ -189,6 +189,9 @@ struct NowPlayingTransportControls: View {
 
     var presentation: Presentation = .standard
 
+    @State private var playbackToggleFeedback = 0
+    @State private var trackSkipFeedback = 0
+
     private var isTablet: Bool { presentation == .tablet }
     private var controlDiameter: CGFloat { isTablet ? 44 : 64 }
 
@@ -202,7 +205,7 @@ struct NowPlayingTransportControls: View {
                         .frame(width: 44, height: 44)
                         .contentShape(.circle)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.subtlePress)
                 .accessibilityLabel(
                     player.isShuffled
                         ? L10n.string("ui.player.shuffle_off")
@@ -214,6 +217,7 @@ struct NowPlayingTransportControls: View {
             Spacer(minLength: isTablet ? 0 : nil)
 
             Button {
+                trackSkipFeedback += 1
                 Task { await player.previous() }
             } label: {
                 Image(systemName: "backward.fill")
@@ -232,6 +236,7 @@ struct NowPlayingTransportControls: View {
             Spacer(minLength: isTablet ? 0 : nil)
 
             Button {
+                playbackToggleFeedback += 1
                 player.togglePlayback()
             } label: {
                 Group {
@@ -276,6 +281,7 @@ struct NowPlayingTransportControls: View {
             Spacer(minLength: isTablet ? 0 : nil)
 
             Button {
+                trackSkipFeedback += 1
                 Task { await player.next() }
             } label: {
                 Image(systemName: "forward.fill")
@@ -301,12 +307,20 @@ struct NowPlayingTransportControls: View {
                         .frame(width: 44, height: 44)
                         .contentShape(.circle)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.subtlePress)
                 .accessibilityLabel(player.repeatMode.accessibilityTitle)
                 .accessibilityAddTraits(player.repeatMode == .off ? [] : .isSelected)
             }
         }
         .frame(height: isTablet ? 52 : 82)
+        .sensoryFeedback(
+            .impact(weight: .light),
+            trigger: playbackToggleFeedback
+        )
+        .sensoryFeedback(
+            .impact(weight: .light),
+            trigger: trackSkipFeedback
+        )
     }
 }
 
@@ -400,6 +414,8 @@ struct NowPlayingPageSelector: View {
 
     @Binding var page: NowPlayingPage
 
+    @State private var pageSelectionFeedback = 0
+
     var body: some View {
         Group {
             if player.currentSong?.isPodcastProgram == true {
@@ -447,6 +463,7 @@ struct NowPlayingPageSelector: View {
         .padding(.horizontal, 32)
         .foregroundStyle(.white.opacity(0.72))
         .frame(height: 50)
+        .sensoryFeedback(.selection, trigger: pageSelectionFeedback)
     }
 
     private func pageButton(
@@ -460,6 +477,7 @@ struct NowPlayingPageSelector: View {
         return Button {
             let targetPage: NowPlayingPage =
                 isSelected ? .artwork : destination
+            pageSelectionFeedback += 1
             withAnimation(
                 accessibilityReduceMotion
                     ? nil
@@ -508,7 +526,7 @@ struct NowPlayingPageSelector: View {
             .frame(width: 44, height: 44)
             .contentShape(.circle)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.subtlePress)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }

@@ -367,6 +367,7 @@ struct MusicCollectionPrimaryActions: View {
     @Environment(PlayerStore.self) private var player
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.musicCollectionDetailMetrics) private var detailMetrics
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     var body: some View {
         GlassEffectContainer(spacing: detailMetrics.usesAdaptiveHeader ? 10 : 14) {
@@ -405,18 +406,21 @@ struct MusicCollectionPrimaryActions: View {
                         }
                     }
                 } label: {
-                    Group {
-                        if isPreparingPlayback {
-                            HStack(spacing: 8) {
-                                ProgressView()
-                                Text("ui.downloads.preparing")
-                            }
-                        } else {
-                            Label("ui.common.play", systemImage: "play.fill")
+                    ZStack {
+                        Label("ui.common.play", systemImage: "play.fill")
+                            .opacity(isPreparingPlayback ? 0 : 1)
+                            .accessibilityHidden(isPreparingPlayback)
+
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("ui.downloads.preparing")
                         }
+                        .opacity(isPreparingPlayback ? 1 : 0)
+                        .accessibilityHidden(!isPreparingPlayback)
                     }
                     .font(detailMetrics.usesAdaptiveHeader ? .body.weight(.semibold) : .title3.weight(.bold))
                     .frame(minWidth: detailMetrics.usesAdaptiveHeader ? 76 : 116, minHeight: 30)
+                    .animation(.easeOut(duration: 0.15), value: isPreparingPlayback)
                 }
                 .buttonStyle(.glassProminent)
                 .buttonBorderShape(.capsule)
@@ -431,6 +435,12 @@ struct MusicCollectionPrimaryActions: View {
                     )
                     .font(.title2.weight(.semibold))
                     .frame(width: 30, height: 30)
+                    .contentTransition(
+                        accessibilityReduceMotion
+                            ? .opacity
+                            : .symbolEffect(.replace)
+                    )
+                    .animation(.easeOut(duration: 0.2), value: isSaved)
                 }
                 .buttonStyle(.glass)
                 .buttonBorderShape(.circle)

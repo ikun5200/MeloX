@@ -99,7 +99,10 @@ struct NowPlayingLandscapeView: View {
                 radius: player.isPlaying ? 24 : 14,
                 y: player.isPlaying ? 12 : 7
             )
-            .animation(.smooth(duration: 0.45), value: player.isPlaying)
+            .animation(
+                NowPlayingPageTransition.motion.artworkResize.animation,
+                value: player.isPlaying
+            )
             .accessibilityElement()
             .accessibilityLabel(L10n.format("ui.song.artwork_accessibility", song.name))
     }

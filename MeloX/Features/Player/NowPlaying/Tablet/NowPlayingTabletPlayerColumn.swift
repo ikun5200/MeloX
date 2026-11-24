@@ -20,7 +20,9 @@ struct NowPlayingTabletPlayerColumn: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, layout.artworkTopInset)
                 .animation(
-                    accessibilityReduceMotion ? nil : .smooth(duration: 0.48),
+                    accessibilityReduceMotion
+                        ? nil
+                        : NowPlayingPageTransition.motion.artworkResize.animation,
                     value: isArtworkExpanded
                 )
 

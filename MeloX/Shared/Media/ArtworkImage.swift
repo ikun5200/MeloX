@@ -65,10 +65,9 @@ struct ArtworkImage: View {
         } else if hasError {
             placeholder
         } else {
-            ZStack {
-                Color.secondary.opacity(0.12)
-                ProgressView()
-            }
+            // No spinner: a list of thumbnails loading at once would show a
+            // column of them, and the image fades in when it arrives.
+            Color.secondary.opacity(0.12)
         }
     }
 

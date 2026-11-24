@@ -51,7 +51,7 @@ struct NowPlayingPortraitArtwork: View {
         .animation(
             accessibilityReduceMotion
                 ? nil
-                : .easeInOut(duration: 0.3),
+                : NowPlayingPageTransition.motion.artworkResize.animation,
             value: player.isPlaying
         )
         .accessibilityElement()
@@ -62,7 +62,14 @@ struct NowPlayingPortraitArtwork: View {
     }
 
     private func animateBounce() async {
-        bounceScale = 1
+        if bounceScale != 1 {
+            // Retarget a bounce in flight rather than snapping to rest.
+            withAnimation(
+                accessibilityReduceMotion ? nil : .smooth(duration: 0.2)
+            ) {
+                bounceScale = 1
+            }
+        }
         guard isArtworkPage, player.isPlaying, !accessibilityReduceMotion else {
             return
         }

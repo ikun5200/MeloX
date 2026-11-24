@@ -5,6 +5,7 @@ struct TrackRowView: View {
     @Environment(PlayerStore.self) private var player
     @Environment(LibraryStore.self) private var library
     @Environment(DownloadStore.self) private var downloads
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     let song: Song
     var index: Int?
@@ -14,6 +15,11 @@ struct TrackRowView: View {
     @State private var presentedSheet: TrackRowSheet?
 
     var body: some View {
+        let isDownloading = AppFeatureAvailability.downloads
+            && downloads.isDownloading(songID: song.id)
+        let isDownloaded = AppFeatureAvailability.downloads
+            && downloads.contains(songID: song.id)
+
         HStack(spacing: 12) {
             if showsArtwork {
                 ArtworkImage(url: song.album?.artworkURL, cornerRadius: 6)
@@ -40,16 +46,22 @@ struct TrackRowView: View {
             }
             Spacer(minLength: 8)
             if AppFeatureAvailability.downloads {
-                if downloads.isDownloading(songID: song.id) {
-                    ProgressView()
-                        .controlSize(.mini)
-                        .accessibilityLabel("ui.downloads.downloading")
-                } else if downloads.contains(songID: song.id) {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel("ui.downloads.downloaded")
+                Group {
+                    if isDownloading {
+                        ProgressView()
+                            .controlSize(.mini)
+                            .accessibilityLabel("ui.downloads.downloading")
+                            .transition(downloadStateTransition)
+                    } else if isDownloaded {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("ui.downloads.downloaded")
+                            .transition(downloadStateTransition)
+                    }
                 }
+                .animation(.easeOut(duration: 0.2), value: isDownloading)
+                .animation(.easeOut(duration: 0.2), value: isDownloaded)
             }
             if song.durationMS > 0 {
                 Text(song.durationText)
@@ -88,13 +100,13 @@ struct TrackRowView: View {
             }
 
             if AppFeatureAvailability.downloads {
-                if downloads.isDownloading(songID: song.id) {
+                if isDownloading {
                     Button {
                         downloads.cancel(songID: song.id)
                     } label: {
                         Label("ui.downloads.cancel", systemImage: "xmark.circle")
                     }
-                } else if downloads.contains(songID: song.id) {
+                } else if isDownloaded {
                     Button(role: .destructive) {
                         downloads.remove(songID: song.id)
                     } label: {
@@ -159,6 +171,12 @@ struct TrackRowView: View {
         .accessibilityAction(named: L10n.string("ui.comments.view")) {
             presentedSheet = .comments(song)
         }
+    }
+
+    private var downloadStateTransition: AnyTransition {
+        accessibilityReduceMotion
+            ? .opacity
+            : .opacity.combined(with: .scale(scale: 0.8))
     }
 
     private var favoriteActionTitle: String {

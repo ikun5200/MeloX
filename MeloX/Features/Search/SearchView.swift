@@ -133,13 +133,17 @@ struct SearchView: View {
 
     private var searchResults: some View {
         List {
-            if phase == .loading {
-                HStack {
-                    Spacer()
-                    ProgressView("ui.search.searching")
-                    Spacer()
+            Group {
+                if phase == .loading {
+                    HStack {
+                        Spacer()
+                        ProgressView("ui.search.searching")
+                        Spacer()
+                    }
+                    .transition(.opacity)
                 }
             }
+            .animation(.easeOut(duration: 0.15), value: phase == .loading)
 
             switch scope {
             case .songs:

@@ -107,13 +107,13 @@ struct NowPlayingArtworkPage: View {
                 .animation(
                     accessibilityReduceMotion
                         ? nil
-                        : .smooth(duration: 0.48),
+                        : NowPlayingPageTransition.motion.artworkResize.animation,
                     value: isArtworkExpanded
                 )
                 .animation(
                     accessibilityReduceMotion
                         ? nil
-                        : .easeInOut(duration: 0.3),
+                        : NowPlayingPageTransition.motion.artworkResize.animation,
                     value: player.isPlaying
                 )
                 .accessibilityElement()
@@ -160,7 +160,14 @@ struct NowPlayingArtworkPage: View {
     private func animateArtworkBounce(
         whenPlaying isPlaying: Bool
     ) async {
-        artworkBounceScale = 1
+        if artworkBounceScale != 1 {
+            // Retarget a bounce in flight rather than snapping to rest.
+            withAnimation(
+                accessibilityReduceMotion ? nil : .smooth(duration: 0.2)
+            ) {
+                artworkBounceScale = 1
+            }
+        }
         guard showsArtwork,
               isPlaying,
               !accessibilityReduceMotion else {

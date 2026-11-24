@@ -521,6 +521,11 @@ struct PlaylistDetailView: View {
            let snapshot: PlaylistContentSnapshot = await api.pageContentCache.value(
                for: PlaylistContentSnapshot.cacheKey(id: id)
            ) {
+            // Mounting the whole track list while the zoom is still running
+            // drops frames, so the cached copy waits for it like a fresh
+            // response does.
+            try? await transitionDelay.value
+            guard !Task.isCancelled else { return }
             playlist = snapshot.playlist
             contentAccountToken = accountToken
             loadedTrackOffset = snapshot.loadedTrackOffset

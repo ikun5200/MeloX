@@ -431,9 +431,27 @@ final class DownloadStore {
               var download = activeDownloads[songID] else {
             return
         }
+        guard shouldPublish(progress, replacing: download) else { return }
         download.receivedByteCount = progress.receivedByteCount
         download.expectedByteCount = progress.expectedByteCount
         activeDownloads[songID] = download
+    }
+
+    // Rows only observe whether a download is active, so byte counts are
+    // published in coarse steps instead of on every transfer callback.
+    private func shouldPublish(
+        _ progress: DownloadTransferProgress,
+        replacing published: ActiveSongDownload
+    ) -> Bool {
+        guard let publishedFraction = published.fractionCompleted,
+              let fraction = progress.fractionCompleted,
+              progress.expectedByteCount == published.expectedByteCount else {
+            return true
+        }
+        if progress.receivedByteCount == progress.expectedByteCount {
+            return progress.receivedByteCount != published.receivedByteCount
+        }
+        return fraction - publishedFraction >= 0.02
     }
 
     private func startQueuedDownloadsIfNeeded() {

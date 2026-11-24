@@ -10,6 +10,7 @@ struct TabletMiniPlayerView: View {
     let onExpand: (NowPlayingPage?) -> Void
 
     @State private var availableWidth: CGFloat = 0
+    @State private var playbackFeedbackCount = 0
 
     var body: some View {
         if let song = player.currentSong {
@@ -52,7 +53,7 @@ struct TabletMiniPlayerView: View {
                 }
                 .foregroundStyle(.secondary)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.subtlePress)
             .foregroundStyle(.primary)
             .padding(.horizontal, 18)
             .padding(.vertical, 8)
@@ -83,19 +84,28 @@ struct TabletMiniPlayerView: View {
                         in: artworkTransitionNamespace
                     )
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(song.name)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
-                    Text(song.artistText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                ZStack(alignment: .leading) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(song.name)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                        Text(song.artistText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .id(song.id)
+                    .transition(.opacity)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .animation(
+                    reducesMotion ? nil : .easeOut(duration: 0.2),
+                    value: song.id
+                )
             }
             .contentShape(.rect)
         }
+        .buttonStyle(SubtlePressButtonStyle(pressedScale: 1, pressedOpacity: 0.7))
         .accessibilityLabel(Text(verbatim: song.name))
         .accessibilityValue(Text(verbatim: song.artistText))
         .accessibilityIdentifier("tablet-mini-open")
@@ -113,17 +123,27 @@ struct TabletMiniPlayerView: View {
             }
             .accessibilityLabel("ui.player.previous")
 
-            Button(action: player.togglePlayback) {
-                Group {
+            Button {
+                playbackFeedbackCount += 1
+                player.togglePlayback()
+            } label: {
+                ZStack {
                     if player.isLoading {
                         ProgressView()
+                            .transition(.opacity)
                     } else {
                         Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                             .font(.system(size: 24, weight: .semibold))
                             .contentTransition(reducesMotion ? .identity : .symbolEffect(.replace))
+                            .animation(
+                                reducesMotion ? nil : .snappy(duration: 0.2, extraBounce: 0),
+                                value: player.isPlaying
+                            )
+                            .transition(.opacity)
                     }
                 }
                 .frame(width: 48, height: 44)
+                .animation(.easeOut(duration: 0.15), value: player.isLoading)
                 .contentShape(.circle)
             }
             .accessibilityLabel(
@@ -142,6 +162,7 @@ struct TabletMiniPlayerView: View {
             }
             .accessibilityLabel("ui.player.next")
         }
+        .sensoryFeedback(.impact(weight: .light), trigger: playbackFeedbackCount)
     }
 
     private func seekControl(song: Song) -> some View {
@@ -168,15 +189,15 @@ struct TabletMiniPlayerView: View {
     }
 
     private func progressLine(song: Song) -> some View {
-        GeometryReader { proxy in
-            Capsule()
-                .fill(.red.opacity(0.7))
-                .frame(width: proxy.size.width * min(max(player.progress / duration(for: song), 0), 1))
-        }
-        .frame(height: 2)
-        .padding(.horizontal, 18)
-        .accessibilityHidden(true)
-        .allowsHitTesting(false)
+        let fraction = CGFloat(min(max(player.progress / duration(for: song), 0), 1))
+        return Capsule()
+            .fill(.red.opacity(0.7))
+            .scaleEffect(x: fraction, y: 1, anchor: .leading)
+            .animation(reducesMotion ? nil : .linear(duration: 0.1), value: fraction)
+            .frame(height: 2)
+            .padding(.horizontal, 18)
+            .accessibilityHidden(true)
+            .allowsHitTesting(false)
     }
 
     private func duration(for song: Song) -> TimeInterval {

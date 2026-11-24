@@ -11,6 +11,7 @@ struct NowPlayingSongActions: View {
     var showsFavoriteButton = true
 
     @State private var presentedSheet: NowPlayingSongSheet?
+    @State private var favoriteFeedback = 0
     var body: some View {
         HStack(spacing: 10) {
             if showsFavoriteButton, !song.isPodcastProgram {
@@ -36,9 +37,14 @@ struct NowPlayingSongActions: View {
                     .presentationDragIndicator(.visible)
             }
         }
+        .sensoryFeedback(
+            .impact(weight: .light),
+            trigger: favoriteFeedback
+        )
     }
     private var favoriteButton: some View {
         Button {
+            favoriteFeedback += 1
             library.toggle(song: song)
         } label: {
             Image(
@@ -51,7 +57,7 @@ struct NowPlayingSongActions: View {
             .background(.white.opacity(0.13), in: .circle)
             .contentShape(.circle)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.subtlePress)
         .accessibilityLabel(
             library.contains(song: song)
                 ? L10n.string("ui.common.unfavorite")

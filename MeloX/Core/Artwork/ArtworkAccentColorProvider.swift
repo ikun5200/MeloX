@@ -82,7 +82,15 @@ actor ArtworkAccentColorProvider {
         for artworkURL: URL?
     ) -> ArtworkDetailAssets? {
         guard let artworkURL else { return nil }
-        return assetsCache.assets(for: artworkURL)
+        return assetsCache.assets(for: canonicalURL(artworkURL))
+    }
+
+    /// Callers pass both raw API strings (often `http://`) and URLs that
+    /// already went through `makeArtworkURL`. Keying and loading by the
+    /// normalised form lets a card's prefetch serve the detail page, and
+    /// keeps plain-http covers from being refused by App Transport Security.
+    private nonisolated static func canonicalURL(_ artworkURL: URL) -> URL {
+        makeArtworkURL(from: artworkURL.absoluteString) ?? artworkURL
     }
 
     nonisolated static func clearCache() {
@@ -91,7 +99,7 @@ actor ArtworkAccentColorProvider {
 
     func accentColor(for artworkURL: URL?) async -> SIMD3<Double> {
         guard let artworkURL else { return Self.fallback }
-        if let cachedAssets = Self.assetsCache.assets(for: artworkURL) {
+        if let cachedAssets = Self.cachedDetailAssets(for: artworkURL) {
             return cachedAssets.palette.accentRGB
         }
 
@@ -112,7 +120,7 @@ actor ArtworkAccentColorProvider {
         for artworkURL: URL?,
         fallbackPrefersDarkAppearance: Bool = false
     ) async -> ArtworkDetailAssets {
-        guard let artworkURL else {
+        guard let artworkURL = artworkURL.map(Self.canonicalURL) else {
             return .fallback(
                 prefersDarkAppearance: fallbackPrefersDarkAppearance
             )

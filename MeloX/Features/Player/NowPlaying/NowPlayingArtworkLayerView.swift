@@ -61,7 +61,6 @@ final class NowPlayingArtworkLayerHostView: UIView {
     private static let bounceAnimationKey = "playBounce"
 
     private let imageView = UIImageView()
-    private let activityIndicator = UIActivityIndicatorView(style: .medium)
     private var configuration: Configuration?
     private var imageTask: Task<Void, Never>?
     private var hasPlacedArtwork = false
@@ -81,15 +80,6 @@ final class NowPlayingArtworkLayerHostView: UIView {
         imageView.layer.minificationFilter = .trilinear
         imageView.tintColor = .secondaryLabel
         addSubview(imageView)
-
-        activityIndicator.hidesWhenStopped = true
-        activityIndicator.autoresizingMask = [
-            .flexibleLeftMargin,
-            .flexibleRightMargin,
-            .flexibleTopMargin,
-            .flexibleBottomMargin,
-        ]
-        imageView.addSubview(activityIndicator)
     }
 
     @available(*, unavailable)
@@ -138,10 +128,6 @@ final class NowPlayingArtworkLayerHostView: UIView {
         guard hasPlacedArtwork, let old else {
             imageView.bounds.size = newSize
             imageView.center = newCenter
-            activityIndicator.center = CGPoint(
-                x: newSize.width / 2,
-                y: newSize.height / 2
-            )
             hasPlacedArtwork = true
             return
         }
@@ -222,24 +208,42 @@ final class NowPlayingArtworkLayerHostView: UIView {
     private func updateBounce(from old: Configuration?, to new: Configuration) {
         guard old?.isPlaying != new.isPlaying else { return }
 
+        // Continue from wherever a bounce in flight has reached, so quick
+        // play/pause taps retarget instead of snapping back to rest.
+        let currentScale = imageView.layer.presentation()?
+            .value(forKeyPath: "transform.scale") as? CGFloat ?? 1
         imageView.layer.removeAnimation(forKey: Self.bounceAnimationKey)
         guard new.isPlaying,
               new.page == .artwork,
               !new.reducesMotion else {
+            settleBounce(from: currentScale)
             return
         }
 
         if window == nil {
             needsInitialBounce = true
         } else {
-            bounce()
+            bounce(from: currentScale)
         }
     }
 
-    private func bounce() {
+    private func settleBounce(from scale: CGFloat) {
+        guard abs(scale - 1) > 0.001 else { return }
+        let settle = CASpringAnimation(
+            perceptualDuration: 0.2,
+            bounce: 0
+        )
+        settle.keyPath = "transform.scale"
+        settle.fromValue = scale
+        settle.toValue = 1
+        settle.duration = settle.settlingDuration
+        imageView.layer.add(settle, forKey: Self.bounceAnimationKey)
+    }
+
+    private func bounce(from scale: CGFloat = 1) {
         let peakScale = 1.055
         let rise = CABasicAnimation(keyPath: "transform.scale")
-        rise.fromValue = 1
+        rise.fromValue = scale
         rise.toValue = peakScale
         rise.duration = 0.17
         rise.timingFunction = CAMediaTimingFunction(name: .easeOut)
@@ -304,7 +308,6 @@ final class NowPlayingArtworkLayerHostView: UIView {
     }
 
     private func show(_ image: UIImage, animated: Bool) {
-        activityIndicator.stopAnimating()
         let update = {
             self.imageView.contentMode = .scaleAspectFill
             self.imageView.backgroundColor = nil
@@ -325,11 +328,9 @@ final class NowPlayingArtworkLayerHostView: UIView {
     private func showLoading() {
         imageView.image = nil
         imageView.backgroundColor = Self.placeholderBackground
-        activityIndicator.startAnimating()
     }
 
     private func showPlaceholder() {
-        activityIndicator.stopAnimating()
         imageView.contentMode = .center
         imageView.backgroundColor = Self.placeholderBackground
         imageView.image = UIImage(

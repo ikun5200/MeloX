@@ -12,8 +12,6 @@ struct NowPlayingView: View {
     @Environment(PlayerStore.self) private var player
     @Environment(AppSettings.self) private var settings
     @Environment(LyricsStore.self) private var lyricsStore
-    @Environment(\.effectiveLyricsRefreshRate)
-    private var effectiveLyricsRefreshRate
 
     @State private var pageTransition: NowPlayingTransitionCoordinator
     @State private var showsLyricsControls = true
@@ -21,7 +19,7 @@ struct NowPlayingView: View {
     @State private var highlightedLyricID: LyricLine.ID?
     @State private var showsTextPVLandscapeSuggestion = false
     @State private var isQueueSongHeaderHidden = false
-    @State private var queueSongHeaderOffset: CGFloat = 0
+    @State private var queueHeaderScroll = NowPlayingQueueHeaderScroll()
     @State private var artworkPageFrame = CGRect.zero
     @State private var preparedLyricsSongID: Song.ID?
     @State private var hasDisplayDivision = false
@@ -517,14 +515,19 @@ struct NowPlayingView: View {
             }
 
             if page != .artwork {
-                sharedPortraitSongHeader(for: song)
-                    .offset(y: sharedPortraitSongHeaderOffset)
-                    .clipped()
-                    .transition(
-                        NowPlayingPageTransition.songHeader(
-                            reducesMotion: accessibilityReduceMotion
-                        )
+                NowPlayingQueueHeaderOffsetReader(
+                    scroll: queueHeaderScroll,
+                    isActive: page == .queue
+                ) { headerOffset in
+                    sharedPortraitSongHeader(for: song)
+                        .offset(y: headerOffset)
+                }
+                .clipped()
+                .transition(
+                    NowPlayingPageTransition.songHeader(
+                        reducesMotion: accessibilityReduceMotion
                     )
+                )
             }
 
         }
@@ -538,67 +541,20 @@ struct NowPlayingView: View {
                 if artworkPageFrame.width > 0 {
                     let artworkReturnsToPlayer = page == .lyrics
                     let artworkScale = artworkOverlayScale
-                    let artworkOffset = artworkOverlayOffset
 
-                    // Shadow and play bounce only; the image itself is the
-                    // Core Animation layer below.
-                    NowPlayingPortraitArtwork(
-                        song: song,
-                        isArtworkPage: page == .artwork,
-                        showsImage: false
-                    )
-                    .frame(
-                        width: artworkPageFrame.width,
-                        height: artworkPageFrame.height
-                    )
-                    .scaleEffect(artworkScale)
-                    .offset(artworkOffset)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-                    .position(
-                        x:
-                            artworkPageFrame.midX
-                            + Self.portraitHorizontalPadding,
-                        y: artworkPageFrame.midY
-                    )
-                    .animation(
-                        accessibilityReduceMotion
-                            ? nil
-                            : NowPlayingPageTransition
-                                .motion
-                                .artworkResize
-                                .animation,
-                        value: isPortraitArtworkExpanded
-                    )
-                    .animation(
-                        accessibilityReduceMotion
-                            ? nil
-                            : .spring(
-                                response: 0.5,
-                                dampingFraction: 0.88,
-                                blendDuration: 0.08
-                            ),
-                        value: page
-                    )
-
-                    NowPlayingArtworkLayerView(
-                        url: song.album?.artworkURL,
-                        imageSize: artworkPageFrame.size,
-                        targetFrame: artworkOverlayFrame(
+                    NowPlayingQueueHeaderOffsetReader(
+                        scroll: queueHeaderScroll,
+                        isActive: page == .queue
+                    ) { headerOffset in
+                        portraitArtworkOverlay(
+                            for: song,
                             scale: artworkScale,
-                            offset: artworkOffset
-                        ),
-                        page: page,
-                        isExpanded: isPortraitArtworkExpanded,
-                        isPlaying: player.isPlaying,
-                        reducesMotion: accessibilityReduceMotion
-                    )
-                    .frame(
-                        width: proxy.size.width,
-                        height: proxy.size.height
-                    )
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
+                            offset: artworkOverlayOffset(
+                                headerOffset: headerOffset
+                            ),
+                            size: proxy.size
+                        )
+                    }
 
                     if artworkReturnsToPlayer {
                         Color.clear
@@ -620,8 +576,7 @@ struct NowPlayingView: View {
                                     NowPlayingSongHeader.referenceHeight / 2
                                     + Self.portraitHorizontalPadding,
                                 y:
-                                    sharedPortraitSongHeaderOffset
-                                    + NowPlayingSongHeader.referenceHeight / 2
+                                    NowPlayingSongHeader.referenceHeight / 2
                             )
                     }
                 }
@@ -721,7 +676,7 @@ struct NowPlayingView: View {
                 isQueueSongHeaderHidden = $0
             },
             onSongHeaderOffsetChange: {
-                queueSongHeaderOffset = $0
+                queueHeaderScroll.offset = $0
             }
         )
         .clipped()
@@ -764,13 +719,6 @@ struct NowPlayingView: View {
             onInterfaceVisibilityChange:
                 setAppleMusicLyricsControlsVisible,
             onInitialFocusPrepared: onInitialFocusPrepared
-        )
-        // Keep the lyrics focus cascade at 60Hz while the page is moving.
-        // The cover transition then has the GPU budget to stay smooth;
-        // the user's full refresh rate resumes once the page settles.
-        .environment(
-            \.effectiveLyricsRefreshRate,
-            transitionLyricsRefreshRate
         )
         .accessibilityAction(
             named: lyricsInterfaceAccessibilityActionName
@@ -847,11 +795,13 @@ struct NowPlayingView: View {
             / artworkPageFrame.width
     }
 
-    private var artworkReturnOffset: CGSize {
+    private func artworkReturnOffset(
+        headerOffset: CGFloat
+    ) -> CGSize {
         guard artworkPageFrame.width > 0 else { return .zero }
         let smallCenter = CGPoint(
             x: NowPlayingSongHeader.referenceHeight / 2,
-            y: sharedPortraitSongHeaderOffset
+            y: headerOffset
                 + NowPlayingSongHeader.referenceHeight / 2
         )
         return CGSize(
@@ -869,8 +819,77 @@ struct NowPlayingView: View {
         return artworkReturnScale
     }
 
-    private var artworkOverlayOffset: CGSize {
-        page == .artwork ? .zero : artworkReturnOffset
+    private func artworkOverlayOffset(
+        headerOffset: CGFloat
+    ) -> CGSize {
+        page == .artwork
+            ? .zero
+            : artworkReturnOffset(headerOffset: headerOffset)
+    }
+
+    /// The moving artwork: a SwiftUI shadow and bounce under the Core
+    /// Animation image layer. Built from the queue header reader so a queue
+    /// scroll re-evaluates only this, not the whole player.
+    private func portraitArtworkOverlay(
+        for song: Song,
+        scale artworkScale: CGFloat,
+        offset artworkOffset: CGSize,
+        size: CGSize
+    ) -> some View {
+        ZStack(alignment: .topLeading) {
+            NowPlayingPortraitArtwork(
+                song: song,
+                isArtworkPage: page == .artwork,
+                showsImage: false
+            )
+            .frame(
+                width: artworkPageFrame.width,
+                height: artworkPageFrame.height
+            )
+            .scaleEffect(artworkScale)
+            .offset(artworkOffset)
+            .position(
+                x:
+                    artworkPageFrame.midX
+                    + Self.portraitHorizontalPadding,
+                y: artworkPageFrame.midY
+            )
+            .animation(
+                accessibilityReduceMotion
+                    ? nil
+                    : NowPlayingPageTransition
+                        .motion
+                        .artworkResize
+                        .animation,
+                value: isPortraitArtworkExpanded
+            )
+            .animation(
+                accessibilityReduceMotion
+                    ? nil
+                    : .spring(
+                        response: 0.5,
+                        dampingFraction: 0.88,
+                        blendDuration: 0.08
+                    ),
+                value: page
+            )
+
+            NowPlayingArtworkLayerView(
+                url: song.album?.artworkURL,
+                imageSize: artworkPageFrame.size,
+                targetFrame: artworkOverlayFrame(
+                    scale: artworkScale,
+                    offset: artworkOffset
+                ),
+                page: page,
+                isExpanded: isPortraitArtworkExpanded,
+                isPlaying: player.isPlaying,
+                reducesMotion: accessibilityReduceMotion
+            )
+        }
+        .frame(width: size.width, height: size.height)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     /// The artwork's visible rectangle in the overlay's coordinate space,
@@ -898,19 +917,6 @@ struct NowPlayingView: View {
 
     private var isPortraitArtworkExpanded: Bool {
         player.isPlaying || !settings.shrinksPausedArtwork
-    }
-
-    private var transitionLyricsRefreshRate: LyricsRefreshRate {
-        guard pageTransition.transition != nil else {
-            return effectiveLyricsRefreshRate
-        }
-        return effectiveLyricsRefreshRate == .fps30
-            ? .fps30
-            : .fps60
-    }
-
-    private var sharedPortraitSongHeaderOffset: CGFloat {
-        page == .queue ? queueSongHeaderOffset : 0
     }
 
     private func pageContentTransition(
@@ -1117,9 +1123,10 @@ struct NowPlayingView: View {
 
     private func toggleLyricsControls() {
         withAnimation(
-            accessibilityReduceMotion
-                ? nil
-                : .smooth(duration: 0.3)
+            NowPlayingInterfaceTransition.interfaceAnimation(
+                isVisible: !showsLyricsControls,
+                reducesMotion: accessibilityReduceMotion
+            )
         ) {
             showsLyricsControls.toggle()
         }

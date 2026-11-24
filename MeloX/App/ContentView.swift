@@ -370,22 +370,24 @@ struct ContentView: View {
 
     @ViewBuilder
     private var playerAwareTabView: some View {
-        if player.currentSong != nil {
-            if #available(iOS 26.1, *) {
-                tabs
-                    .tabViewBottomAccessory(
-                        isEnabled: !isTabViewBottomAccessorySuppressed
-                    ) {
+        if #available(iOS 26.1, *) {
+            // A single branch keeps the tab view's identity: starting the
+            // first song only enables the accessory instead of rebuilding
+            // every tab and resetting its scroll position.
+            tabs
+                .tabViewBottomAccessory(
+                    isEnabled: player.currentSong != nil
+                        && !isTabViewBottomAccessorySuppressed
+                ) {
+                    miniPlayer
+                }
+        } else if player.currentSong != nil {
+            tabs
+                .tabViewBottomAccessory {
+                    if !isTabViewBottomAccessorySuppressed {
                         miniPlayer
                     }
-            } else {
-                tabs
-                    .tabViewBottomAccessory {
-                        if !isTabViewBottomAccessorySuppressed {
-                            miniPlayer
-                        }
-                    }
-            }
+                }
         } else {
             tabs
         }

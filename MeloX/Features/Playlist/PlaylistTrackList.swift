@@ -64,6 +64,7 @@ private struct PlaylistTrackRow: View {
     @Environment(DownloadStore.self) private var downloads
     @Environment(AppSettings.self) private var settings
     @Environment(\.musicCollectionDetailMetrics) private var detailMetrics
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     @State private var presentedSheet: PlaylistSongSheet?
 
@@ -84,7 +85,19 @@ private struct PlaylistTrackRow: View {
             && !downloads.isDownloading(songID: song.id)
     }
 
+    private var downloadStateTransition: AnyTransition {
+        accessibilityReduceMotion
+            ? .opacity
+            : .opacity.combined(with: .scale(scale: 0.8))
+    }
+
     var body: some View {
+        let showsDownloadState = settings.isContentFeatureEnabled(.downloads)
+        let isDownloading = showsDownloadState
+            && downloads.isDownloading(songID: song.id)
+        let isDownloaded = showsDownloadState
+            && downloads.contains(songID: song.id)
+
         HStack(spacing: 4) {
             Button(action: primaryAction) {
                 HStack(spacing: 12) {
@@ -140,17 +153,23 @@ private struct PlaylistTrackRow: View {
             .accessibilityValue(primaryActionAccessibilityValue)
             .accessibilityIdentifier("collection-track-\(song.id)")
 
-            if settings.isContentFeatureEnabled(.downloads) {
-                if downloads.isDownloading(songID: song.id) {
-                    ProgressView()
-                        .controlSize(.mini)
-                        .accessibilityLabel("ui.downloads.downloading")
-                } else if downloads.contains(songID: song.id) {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel("ui.downloads.downloaded")
+            if showsDownloadState {
+                Group {
+                    if isDownloading {
+                        ProgressView()
+                            .controlSize(.mini)
+                            .accessibilityLabel("ui.downloads.downloading")
+                            .transition(downloadStateTransition)
+                    } else if isDownloaded {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("ui.downloads.downloaded")
+                            .transition(downloadStateTransition)
+                    }
                 }
+                .animation(.easeOut(duration: 0.2), value: isDownloading)
+                .animation(.easeOut(duration: 0.2), value: isDownloaded)
             }
 
             if !isSelectingDownloads {
@@ -165,14 +184,14 @@ private struct PlaylistTrackRow: View {
                         )
                     }
 
-                    if settings.isContentFeatureEnabled(.downloads) {
-                        if downloads.isDownloading(songID: song.id) {
+                    if showsDownloadState {
+                        if isDownloading {
                             Button {
                                 downloads.cancel(songID: song.id)
                             } label: {
                                 Label("ui.downloads.cancel", systemImage: "xmark.circle")
                             }
-                        } else if downloads.contains(songID: song.id) {
+                        } else if isDownloaded {
                             Button(role: .destructive) {
                                 downloads.remove(songID: song.id)
                             } label: {

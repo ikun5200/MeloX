@@ -60,6 +60,7 @@ struct ExploreView: View {
                 )
 
                 categoryContent
+                    .animation(.easeOut(duration: 0.2), value: playlists.isEmpty)
             }
             .padding(.horizontal, featuredMetrics.horizontalPadding)
             .padding(.bottom, 28)
@@ -84,17 +85,21 @@ struct ExploreView: View {
             case .loading:
                 ProgressView("ui.explore.loading")
                     .frame(maxWidth: .infinity, minHeight: 320)
+                    .transition(.opacity)
             case .failed(let message):
                 ConnectionUnavailableView(message: message) {
                     reloadToken += 1
                 }
                 .frame(maxWidth: .infinity, minHeight: 320)
+                .transition(.opacity)
             case .loaded:
                 ContentUnavailableView("ui.playlists.empty", systemImage: "music.note.list")
                     .frame(maxWidth: .infinity, minHeight: 320)
+                    .transition(.opacity)
             }
         } else {
             featuredShelf
+                .transition(.opacity)
 
             VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .firstTextBaseline) {
@@ -122,6 +127,7 @@ struct ExploreView: View {
                     }
                 }
             }
+            .transition(.opacity)
 
             if phase == .loading {
                 ProgressView()

@@ -234,6 +234,15 @@ final class PlayerStore {
     @ObservationIgnored
     private var isLoadingAutoplayRecommendations = false
 
+    /// Set while a seek issued during playback is still buffering. The
+    /// engine reports that gap as loading; publishing it as a pause made
+    /// every scrub flash the transport spinner and shrink the artwork.
+    @ObservationIgnored
+    private var isHoldingPlaybackStateForSeek = false
+
+    @ObservationIgnored
+    private var seekLoadingIndicatorTask: Task<Void, Never>?
+
     @ObservationIgnored
     private var nowPlayingLyricsSongID: Int?
 
@@ -800,6 +809,7 @@ final class PlayerStore {
         progress = clamped
         reanchorPlaybackTimeline(to: clamped, rate: 0)
         seekRevision += 1
+        holdPlaybackStateForSeekIfNeeded()
         engine.seek(to: clamped)
         if reportsToRoom {
             onListenTogetherTransport?(.progress, currentSong?.id)
@@ -808,7 +818,37 @@ final class PlayerStore {
             forceNowPlayingLyrics: true,
             forceLyricsLiveActivity: true
         )
-        persistSnapshot()
+        lastPersistedSecond = Int(clamped)
+        persistence.saveProgress(clamped)
+    }
+
+    private func holdPlaybackStateForSeekIfNeeded() {
+        seekLoadingIndicatorTask?.cancel()
+        seekLoadingIndicatorTask = nil
+        guard isPlaying else {
+            isHoldingPlaybackStateForSeek = false
+            return
+        }
+
+        isHoldingPlaybackStateForSeek = true
+        // A slow seek still has to show that it is buffering.
+        seekLoadingIndicatorTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: .milliseconds(350))
+            } catch {
+                return
+            }
+            guard let self, self.isHoldingPlaybackStateForSeek else {
+                return
+            }
+            self.isLoading = true
+        }
+    }
+
+    private func endSeekPlaybackStateHold() {
+        isHoldingPlaybackStateForSeek = false
+        seekLoadingIndicatorTask?.cancel()
+        seekLoadingIndicatorTask = nil
     }
 
     func setNowPlayingLyrics(_ lyrics: [LyricLine], for songID: Int?) {
@@ -1158,6 +1198,7 @@ final class PlayerStore {
         // Listen-together observes both, and the new item is not playing yet.
         currentLoadShouldAutoplay = autoplay
         isResolvingSource = true
+        endSeekPlaybackStateHold()
         isLoading = true
         // Unloading can publish the outgoing deck's final clock sample.
         // Finish those callbacks before initializing the incoming song's timeline.
@@ -1384,14 +1425,18 @@ final class PlayerStore {
             guard let self else { return }
             switch state {
             case .idle:
+                self.endSeekPlaybackStateHold()
                 self.isPlaying = false
                 if !self.isResolvingSource {
                     self.isLoading = false
                 }
             case .loading:
-                self.isPlaying = false
-                self.isLoading = true
+                if !self.isHoldingPlaybackStateForSeek {
+                    self.isPlaying = false
+                    self.isLoading = true
+                }
             case .paused:
+                self.endSeekPlaybackStateHold()
                 self.isPlaying = false
                 if self.engine.expectsPlaybackToContinue {
                     self.isLoading = true
@@ -1400,6 +1445,7 @@ final class PlayerStore {
                     self.isLoading = false
                 }
             case .playing:
+                self.endSeekPlaybackStateHold()
                 self.isPlaying = true
                 self.isLoading = false
                 self.currentLoadShouldAutoplay = true
@@ -1490,7 +1536,7 @@ final class PlayerStore {
         let second = Int(measuredProgress)
         if second != lastPersistedSecond {
             lastPersistedSecond = second
-            persistSnapshot()
+            persistence.saveProgress(measuredProgress)
         }
         prepareAutoMixIfNeeded()
     }
