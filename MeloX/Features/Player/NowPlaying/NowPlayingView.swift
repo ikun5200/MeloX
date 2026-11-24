@@ -534,16 +534,18 @@ struct NowPlayingView: View {
             }
         }
         .overlay {
-            GeometryReader { _ in
+            GeometryReader { proxy in
                 if artworkPageFrame.width > 0 {
                     let artworkReturnsToPlayer = page == .lyrics
                     let artworkScale = artworkOverlayScale
                     let artworkOffset = artworkOverlayOffset
 
+                    // Shadow and play bounce only; the image itself is the
+                    // Core Animation layer below.
                     NowPlayingPortraitArtwork(
                         song: song,
                         isArtworkPage: page == .artwork,
-                        enclosingScale: artworkScale
+                        showsImage: false
                     )
                     .frame(
                         width: artworkPageFrame.width,
@@ -578,6 +580,25 @@ struct NowPlayingView: View {
                             ),
                         value: page
                     )
+
+                    NowPlayingArtworkLayerView(
+                        url: song.album?.artworkURL,
+                        imageSize: artworkPageFrame.size,
+                        targetFrame: artworkOverlayFrame(
+                            scale: artworkScale,
+                            offset: artworkOffset
+                        ),
+                        page: page,
+                        isExpanded: isPortraitArtworkExpanded,
+                        isPlaying: player.isPlaying,
+                        reducesMotion: accessibilityReduceMotion
+                    )
+                    .frame(
+                        width: proxy.size.width,
+                        height: proxy.size.height
+                    )
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
 
                     if artworkReturnsToPlayer {
                         Color.clear
@@ -850,6 +871,29 @@ struct NowPlayingView: View {
 
     private var artworkOverlayOffset: CGSize {
         page == .artwork ? .zero : artworkReturnOffset
+    }
+
+    /// The artwork's visible rectangle in the overlay's coordinate space,
+    /// which extends past the page content by the portrait side margins.
+    private func artworkOverlayFrame(
+        scale: CGFloat,
+        offset: CGSize
+    ) -> CGRect {
+        let size = CGSize(
+            width: artworkPageFrame.width * scale,
+            height: artworkPageFrame.height * scale
+        )
+        return CGRect(
+            x: artworkPageFrame.midX
+                + Self.portraitHorizontalPadding
+                + offset.width
+                - size.width / 2,
+            y: artworkPageFrame.midY
+                + offset.height
+                - size.height / 2,
+            width: size.width,
+            height: size.height
+        )
     }
 
     private var isPortraitArtworkExpanded: Bool {

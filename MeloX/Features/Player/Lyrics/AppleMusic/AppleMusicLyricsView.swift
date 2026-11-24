@@ -1071,6 +1071,10 @@ struct AppleMusicLyricsView: View {
         isPlaying: Bool
     ) {
         guard !wasPlaying, isPlaying else { return }
+        // A lyric-tap seek passes through loading before playing again. The
+        // tap already owns the focus movement; restarting it here cancels the
+        // cascade mid-flight and snaps every line to its destination.
+        guard seekFeedback == nil else { return }
         requestPlaybackFocus()
     }
 

@@ -503,6 +503,11 @@
 "ui.about.app_info.section" = "App Information";
 "ui.about.version" = "Version";
 "ui.about.build" = "Build";
+"ui.about.bundle_id" = "Bundle ID";
+"ui.about.install_check" = "Install Check";
+"ui.about.install_check.normal" = "Normal";
+"ui.about.install_check.bundle_id_mismatch" = "Bundle ID mismatch (%@)";
+"ui.about.install_check.nonstandard_location" = "Non-standard install location";
 "ui.about.release_notes" = "Release Notes";
 "ui.about.check_updates_on_launch" = "Automatically Check for Updates at Launch";
 "ui.about.checking_updates" = "Checking for Updates";

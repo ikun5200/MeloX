@@ -14,15 +14,25 @@ struct NowPlayingPortraitArtwork: View {
     /// The scale applied by the enclosing page transition. The artwork's
     /// corner clip uses this to keep a constant 12pt visible radius.
     var enclosingScale: CGFloat = 1
+    /// The portrait player draws the image with a Core Animation layer and
+    /// keeps only this view's shadow and bounce.
+    var showsImage = true
 
     @State private var bounceScale: CGFloat = 1
 
     var body: some View {
-        ArtworkImage(
-            url: song.album?.artworkURL,
-            cornerRadius: 12,
-            enclosingScale: enclosingScale
-        )
+        Group {
+            if showsImage {
+                ArtworkImage(
+                    url: song.album?.artworkURL,
+                    cornerRadius: 12,
+                    enclosingScale: enclosingScale
+                )
+            } else {
+                Color.clear
+                    .aspectRatio(1, contentMode: .fit)
+            }
+        }
         .background {
             if isArtworkPage {
                 // Fixed radius and fixed blur: the blurred texture is

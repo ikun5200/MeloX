@@ -34,6 +34,11 @@ struct AboutView: View {
             Section("ui.about.app_info.section") {
                 LabeledContent("ui.about.version", value: releaseVersion)
                 LabeledContent("ui.about.build", value: buildNumber)
+                LabeledContent("ui.about.bundle_id", value: bundleIdentifier)
+                LabeledContent(
+                    "ui.about.install_check",
+                    value: installCheckSummary
+                )
             }
 
             Section {
@@ -168,6 +173,34 @@ struct AboutView: View {
 
     private var releaseVersion: String {
         Bundle.main.appReleaseVersion
+    }
+
+    private var bundleIdentifier: String {
+        Bundle.main.bundleIdentifier ?? "-"
+    }
+
+    /// The system routes Now Playing taps and hides its island by the
+    /// installed app's identity. A re-signed or container-hosted copy can
+    /// report an identifier that differs from the one actually installed.
+    private var installCheckSummary: String {
+        let installedIdentifier = NSDictionary(
+            contentsOf: Bundle.main.bundleURL
+                .appendingPathComponent("Info.plist")
+        )?["CFBundleIdentifier"] as? String
+        if let installedIdentifier,
+           installedIdentifier != bundleIdentifier {
+            return L10n.format(
+                "ui.about.install_check.bundle_id_mismatch",
+                installedIdentifier
+            )
+        }
+        guard Bundle.main.bundlePath
+            .contains("/Bundle/Application/") else {
+            return L10n.string(
+                "ui.about.install_check.nonstandard_location"
+            )
+        }
+        return L10n.string("ui.about.install_check.normal")
     }
 
     private let officialWebsiteURL = URL(string: "https://melox.luoxe.cn/")!

@@ -503,6 +503,11 @@
 "ui.about.app_info.section" = "应用信息";
 "ui.about.version" = "版本";
 "ui.about.build" = "构建版本";
+"ui.about.bundle_id" = "包标识";
+"ui.about.install_check" = "安装检查";
+"ui.about.install_check.normal" = "正常";
+"ui.about.install_check.bundle_id_mismatch" = "包标识不一致（%@）";
+"ui.about.install_check.nonstandard_location" = "非标准安装位置";
 "ui.about.release_notes" = "更新日志";
 "ui.about.check_updates_on_launch" = "启动时自动检查更新";
 "ui.about.checking_updates" = "正在检查更新";
