@@ -35,6 +35,86 @@ private struct DeepLinkRetryModifier: ViewModifier {
     }
 }
 
+/// The app's error dialogs.
+///
+/// A dialog is presented by the view its modifier sits on. Raised from the
+/// root while the player covered it, one dismissed the player instead of
+/// appearing, so the same dialogs are attached to the player as well and
+/// only the frontmost of the two is ever active.
+private struct AppErrorAlerts: ViewModifier {
+    @Environment(DownloadStore.self) private var downloads
+    @Environment(FloatingLyricsController.self) private var floatingLyrics
+
+    @Binding var heartModeLaunchErrorMessage: String?
+    let isFrontmost: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .alert(
+                "ui.error.heart_mode_launch.title",
+                isPresented: Binding(
+                    get: {
+                        isFrontmost && heartModeLaunchErrorMessage != nil
+                    },
+                    set: { isPresented in
+                        if !isPresented, isFrontmost {
+                            heartModeLaunchErrorMessage = nil
+                        }
+                    }
+                )
+            ) {
+                Button("ui.common.ok", role: .cancel) {
+                    heartModeLaunchErrorMessage = nil
+                }
+            } message: {
+                Text(heartModeLaunchErrorMessage ?? L10n.string("ui.error.try_again_later"))
+            }
+            .alert(
+                "ui.error.download.title",
+                isPresented: Binding(
+                    get: {
+                        isFrontmost
+                            && AppFeatureAvailability.downloads
+                            && downloads.errorMessage != nil
+                    },
+                    set: { isPresented in
+                        if !isPresented, isFrontmost {
+                            downloads.clearError()
+                        }
+                    }
+                )
+            ) {
+                Button("ui.common.ok", role: .cancel) {
+                    downloads.clearError()
+                }
+            } message: {
+                Text(downloads.errorMessage ?? L10n.string("ui.error.download.operation_failed"))
+            }
+            .alert(
+                "ui.error.floating_lyrics.title",
+                isPresented: Binding(
+                    get: {
+                        isFrontmost && floatingLyrics.errorMessage != nil
+                    },
+                    set: { isPresented in
+                        if !isPresented, isFrontmost {
+                            floatingLyrics.dismissError()
+                        }
+                    }
+                )
+            ) {
+                Button("ui.common.ok", role: .cancel) {
+                    floatingLyrics.dismissError()
+                }
+            } message: {
+                Text(
+                    floatingLyrics.errorMessage
+                        ?? L10n.string("ui.error.picture_in_picture.unavailable")
+                )
+            }
+    }
+}
+
 private struct HeartModeLaunchReadiness: Equatable {
     let hasRestoredPlayback: Bool
     let isLoggedIn: Bool
@@ -118,6 +198,16 @@ struct ContentView: View {
                 switch destination {
                 case .nowPlaying(let initialPage):
                     NowPlayingView(initialPage: initialPage)
+                        .overlay {
+                            PlaybackIssueBanner()
+                        }
+                        .modifier(
+                            AppErrorAlerts(
+                                heartModeLaunchErrorMessage:
+                                    $heartModeLaunchErrorMessage,
+                                isFrontmost: true
+                            )
+                        )
                         .environment(
                             \.openMusicRoute,
                             OpenMusicRouteAction(action: openMusicRoute)
@@ -234,86 +324,19 @@ struct ContentView: View {
                     floatingLyrics.completeRestoration(success: true)
                 }
             }
-            .alert(
-                "ui.error.playback.title",
-                isPresented: Binding(
-                    get: { player.playbackIssue != nil },
-                    set: { isPresented in
-                        if !isPresented {
-                            player.dismissPlaybackIssue()
-                        }
-                    }
-                )
-            ) {
-                if player.canPlayNext {
-                    Button("ui.player.play_next") {
-                        player.dismissPlaybackIssue()
-                        Task { await player.next() }
-                    }
+            .overlay {
+                // The player shows the notice itself while it is up.
+                if playerPresentation == nil {
+                    PlaybackIssueBanner()
                 }
-                Button("ui.common.ok", role: .cancel) {
-                    player.dismissPlaybackIssue()
-                }
-            } message: {
-                Text(player.playbackIssue?.message ?? L10n.string("ui.error.playback.current_unavailable"))
             }
-            .alert(
-                "ui.error.heart_mode_launch.title",
-                isPresented: Binding(
-                    get: { heartModeLaunchErrorMessage != nil },
-                    set: { isPresented in
-                        if !isPresented {
-                            heartModeLaunchErrorMessage = nil
-                        }
-                    }
+            .modifier(
+                AppErrorAlerts(
+                    heartModeLaunchErrorMessage:
+                        $heartModeLaunchErrorMessage,
+                    isFrontmost: playerPresentation == nil
                 )
-            ) {
-                Button("ui.common.ok", role: .cancel) {
-                    heartModeLaunchErrorMessage = nil
-                }
-            } message: {
-                Text(heartModeLaunchErrorMessage ?? L10n.string("ui.error.try_again_later"))
-            }
-            .alert(
-                "ui.error.download.title",
-                isPresented: Binding(
-                    get: {
-                        AppFeatureAvailability.downloads
-                            && downloads.errorMessage != nil
-                    },
-                    set: { isPresented in
-                        if !isPresented {
-                            downloads.clearError()
-                        }
-                    }
-                )
-            ) {
-                Button("ui.common.ok", role: .cancel) {
-                    downloads.clearError()
-                }
-            } message: {
-                Text(downloads.errorMessage ?? L10n.string("ui.error.download.operation_failed"))
-            }
-            .alert(
-                "ui.error.floating_lyrics.title",
-                isPresented: Binding(
-                    get: { floatingLyrics.errorMessage != nil },
-                    set: { isPresented in
-                        if !isPresented {
-                            floatingLyrics.dismissError()
-                        }
-                    }
-                )
-            ) {
-                Button("ui.common.ok", role: .cancel) {
-                    floatingLyrics.dismissError()
-                }
-            } message: {
-                Text(
-                    floatingLyrics.errorMessage
-                        ?? L10n.string("ui.error.picture_in_picture.unavailable")
-                )
-            }
+            )
             .modifier(
                 DeepLinkRetryModifier(
                     router: deepLinkRouter,

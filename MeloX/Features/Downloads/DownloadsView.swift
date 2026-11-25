@@ -28,8 +28,8 @@ struct DownloadsView: View {
                     }
 
                     Picker("ui.downloads.automatic_cache_quality", selection: $settings.automaticCacheQuality) {
-                        ForEach(MusicQuality.allCases) { quality in
-                            Text(quality.title).tag(quality)
+                        ForEach(settings.selectableMusicQualities) { quality in
+                            Text(settings.title(for: quality)).tag(quality)
                         }
                     }
                 }
@@ -58,7 +58,7 @@ struct DownloadsView: View {
                             }
 
                             HStack {
-                                Text(download.quality.title)
+                                Text(settings.title(for: download.quality))
                                 Spacer()
                                 Text(progressText(for: download))
                             }
@@ -96,7 +96,7 @@ struct DownloadsView: View {
                             VStack(alignment: .leading, spacing: 6) {
                                 TrackRowView(song: download.song, showsArtwork: true)
                                 HStack {
-                                    Text(download.quality.title)
+                                    Text(settings.title(for: download.quality))
                                     Spacer()
                                     Text(
                                         download.byteCount.formatted(

@@ -27,7 +27,10 @@ final class AudioPlayerRenderProcessor: NSObject {
         self.outputAudioFormat = outputAudioFormat
     }
 
-    func attachCallback(on player: AVAudioUnit, audioFormat: AVAudioFormat) {
+    /// - Returns: `false` when the unit refused `audioFormat`. Its buffers
+    ///   then keep another layout, and nothing may be rendered into them.
+    @discardableResult
+    func attachCallback(on player: AVAudioUnit, audioFormat: AVAudioFormat) -> Bool {
         if player.auAudioUnit.inputBusses.count > 0 {
             do {
                 try player.auAudioUnit.inputBusses[0].setFormat(audioFormat)
@@ -35,6 +38,7 @@ final class AudioPlayerRenderProcessor: NSObject {
                 Logger.error("Player auAudioUnit inputbus failure %@",
                              category: .audioRendering,
                              args: error.localizedDescription)
+                return false
             }
         }
         // set the max frames to render
@@ -42,13 +46,14 @@ final class AudioPlayerRenderProcessor: NSObject {
 
         // sets the render provider callback
         player.auAudioUnit.outputProvider = renderProvider
+        return true
     }
 
     /// Provides data to the audio engine
     ///
     /// - parameter inNumberFrames: An `AVAudioFrameCount` provided by the `AudioEngine` instance
     /// - returns An optional `UnsafePointer` of `AudioBufferList`
-    func inRender(inNumberFrames: AVAudioFrameCount) -> UnsafePointer<AudioBufferList>? {
+    func inRender(inNumberFrames requestedFrames: AVAudioFrameCount) -> UnsafePointer<AudioBufferList>? {
         playerContext.entriesLock.lock()
         let playingEntry = playerContext.audioPlayingEntry
         let readingEntry = playerContext.audioReadingEntry
@@ -62,6 +67,12 @@ final class AudioPlayerRenderProcessor: NSObject {
         var bufferList = rendererContext.inOutAudioBufferList[0]
         let bufferContext = rendererContext.bufferContext
         let frameSizeInBytes = bufferContext.sizeInBytes
+        // The frames are written into the buffer the output unit handed to
+        // `render`. Never write past it, whatever the engine asks for: a unit
+        // that kept another format has a smaller buffer than this one implies.
+        let inNumberFrames = frameSizeInBytes > 0
+            ? min(requestedFrames, bufferList.mBuffers.mDataByteSize / frameSizeInBytes)
+            : 0
         let used = bufferContext.frameUsedCount
         let start = bufferContext.frameStartIndex
         let end = (bufferContext.frameStartIndex + bufferContext.frameUsedCount) % bufferContext.totalFrameCount
@@ -120,10 +131,7 @@ final class AudioPlayerRenderProcessor: NSObject {
                 }
                 totalFramesCopied = framesToCopy
 
-                rendererContext.lock.lock()
-                bufferContext.frameStartIndex = (bufferContext.frameStartIndex + totalFramesCopied) % bufferContext.totalFrameCount
-                bufferContext.frameUsedCount -= totalFramesCopied
-                rendererContext.lock.unlock()
+                consume(totalFramesCopied, from: bufferContext)
 
             } else {
                 let frameToCopy = min(inNumberFrames, bufferContext.totalFrameCount - start)
@@ -158,10 +166,7 @@ final class AudioPlayerRenderProcessor: NSObject {
                 }
                 totalFramesCopied = frameToCopy + moreFramesToCopy
 
-                rendererContext.lock.lock()
-                bufferContext.frameStartIndex = (bufferContext.frameStartIndex + totalFramesCopied) % bufferContext.totalFrameCount
-                bufferContext.frameUsedCount -= totalFramesCopied
-                rendererContext.lock.unlock()
+                consume(totalFramesCopied, from: bufferContext)
             }
 
             if playerContext.internalState != .playing {
@@ -251,6 +256,22 @@ final class AudioPlayerRenderProcessor: NSObject {
         rendererContext.inOutAudioBufferList[0].mBuffers.mNumberChannels = outputAudioFormat.mChannelsPerFrame
 
         return UnsafePointer(rendererContext.inOutAudioBufferList)
+    }
+
+    /// Advances the ring buffer past frames that were just rendered.
+    ///
+    /// The buffer can be reset by a seek or a stop between the moment the
+    /// frames were read and now; only what is still there is consumed, since
+    /// taking more from the unsigned count would trap.
+    @inline(__always)
+    private func consume(_ frames: UInt32, from bufferContext: BufferContext) {
+        rendererContext.lock.lock()
+        let consumed = min(frames, bufferContext.frameUsedCount)
+        if consumed > 0, bufferContext.totalFrameCount > 0 {
+            bufferContext.frameStartIndex = (bufferContext.frameStartIndex + consumed) % bufferContext.totalFrameCount
+            bufferContext.frameUsedCount -= consumed
+        }
+        rendererContext.lock.unlock()
     }
 
     func render(

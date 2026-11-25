@@ -81,6 +81,33 @@ nonisolated struct SongAudioAvailability: Codable, Hashable, Sendable {
         supports(apiLevel: quality.apiLevel)
     }
 
+    /// The byte size of the file at `quality`, when the song has one.
+    func fileSize(of quality: MusicQuality) -> Int64? {
+        let resource = switch quality {
+        case .standard: standard
+        case .high: high
+        case .lossless: lossless
+        case .hiResolution: hiResolution
+        case .highDefinitionSurround: highDefinitionSurround
+        case .immersiveSurround: immersiveSurround
+        case .ultraClearMaster: ultraClearMaster
+        }
+        guard let size = resource?.size, size > 0 else { return nil }
+        return size
+    }
+
+    /// The tier whose file is exactly `length` bytes. The size reported for
+    /// an encoding is the size of the file the CDN serves, so a stream of
+    /// that length is that encoding whatever it was requested as.
+    func quality(ofFileSized length: Int64) -> MusicQuality? {
+        guard length > 0 else { return nil }
+        return MusicQuality.allCases.first { fileSize(of: $0) == length }
+    }
+
+    var smallestFileSize: Int64? {
+        MusicQuality.allCases.compactMap(fileSize(of:)).min()
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         standard = try container.decodeIfPresent(

@@ -479,3 +479,13 @@ final class DownloadStore {
         }
     }
 }
+
+#if DEBUG && targetEnvironment(simulator)
+extension DownloadStore {
+    /// Raises a download error with nothing else happening, to observe how
+    /// the interface alone reacts to one.
+    func debugRaiseError() {
+        errorMessage = L10n.string("ui.error.download.operation_failed")
+    }
+}
+#endif

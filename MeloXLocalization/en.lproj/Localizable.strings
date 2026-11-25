@@ -52,6 +52,9 @@
 "ui.settings.audio_quality.hd_surround" = "HD Surround";
 "ui.settings.audio_quality.immersive_surround" = "Immersive Surround";
 "ui.settings.audio_quality.master" = "Master Quality";
+"ui.settings.audio_quality.apple.high" = "High Quality";
+"ui.settings.audio_quality.apple.lossless" = "Lossless";
+"ui.settings.audio_quality.apple.hi_res" = "Hi-Res Lossless";
 "ui.settings.volume_control.hidden" = "Hidden";
 "ui.settings.volume_control.hidden.detail" = "The player hides its volume slider; volume is controlled by the system.";
 "ui.settings.volume_control.independent" = "Independent Volume";
@@ -237,6 +240,9 @@
 "ui.error.playback.unavailable" = "“%@” is currently unavailable, possibly due to copyright or regional restrictions.";
 "ui.error.playback.source_load_failed" = "The audio source for “%@” could not be loaded due to copyright, regional restrictions, or a network issue.";
 "ui.error.playback.failed" = "Could not play “%@”: %@";
+"ui.error.playback.no_stream" = "No source can play “%@” right now.";
+"ui.error.playback.no_source_enabled" = "No enabled source supports QQ Music. Add one in Settings first.";
+"ui.error.playback.offline" = "No network connection. Tap play to continue once you’re back online.";
 "ui.error.playback.enable_failed" = "Could not enable audio playback: %@";
 "ui.error.playback.audio_source_failed" = "Could not load the audio source: %@";
 "ui.error.playback.audio_source_retry" = "Could not load the audio source. Try again later.";
@@ -587,10 +593,13 @@
 
 "ui.settings.playback.title" = "Playback & Audio";
 "ui.settings.playback.section.playback" = "Playback";
+"ui.settings.playback.section.quality" = "Audio Quality";
+"ui.settings.playback.apple_music_quality" = "Apple Music-Style Quality Options";
+"ui.settings.playback.quality.rule_footer" = "The chosen quality applies to every song. A song without that tier steps down through QQ Music’s tiers one at a time, for that song only; the next song returns to your choice. A quality picked on the Now Playing screen lasts until the app restarts.";
+"ui.settings.playback.quality.apple_footer" = "Shows three options: High Quality, Lossless and Hi-Res Lossless, which stand for QQ Music’s HQ (320 kbps), SQ Lossless (FLAC) and Hi-Res (24-bit). A song without the matching tier still steps down through QQ Music’s tiers one at a time, and the next song returns to your choice.";
 "ui.settings.playback.wifi_quality" = "Wi-Fi Playback Quality";
 "ui.settings.playback.cellular_quality" = "Cellular Playback Quality";
 "ui.settings.playback.volume_control" = "Volume Control";
-"ui.settings.playback.quality.footer" = "Audio quality is limited by music rights and your account. Hi-Res, spatial audio, and master quality are used only when available and fall back automatically. Quality changes made on the Now Playing screen apply only until the app restarts; reopening the app restores these defaults. %@";
 "ui.settings.playback.section.audio_processing" = "Audio Processing";
 "ui.settings.playback.audio_processing.footer.downloads" = "Equalizer and AutoMix apply to both streaming and downloaded music.";
 "ui.settings.playback.audio_processing.footer" = "Equalizer and AutoMix apply to music playback.";
@@ -910,8 +919,6 @@
 "ui.common.continue" = "Continue";
 "ui.common.maybe_later" = "Maybe Later";
 "ui.common.done" = "Done";
-"ui.error.playback.title" = "Song Cannot Be Played";
-"ui.error.playback.current_unavailable" = "The current song is temporarily unavailable.";
 "ui.player.play_next" = "Play Next Song";
 "ui.error.heart_mode_launch.title" = "Could Not Start Heart Mode Automatically";
 "ui.error.try_again_later" = "Please try again later.";
@@ -1100,7 +1107,7 @@
 "ui.home.error.current_song_required" = "Play a song before searching for similar music.";
 "ui.home.error.no_playable_recommendations" = "QQ Music did not return any playable recommendations.";
 "ui.home.section.recommended_playlists" = "Recommended Playlists";
-"ui.home.section.recently_trending" = "Trending in Cloud Village";
+"ui.home.section.recently_trending" = "Trending Now";
 "ui.home.section.tailored" = "Recommended for Your Taste";
 "ui.home.section.charts" = "Charts";
 "ui.home.section.your_playlists" = "Your Playlists";
@@ -1383,6 +1390,9 @@
 "ui.player.loading_quality" = "Loading Available Quality";
 "ui.player.quality" = "Quality";
 "ui.player.quality_unavailable" = "%@ unavailable";
+"ui.player.quality_downgraded" = "No %@. Playing %@.";
+"ui.player.quality_not_in_song" = "Not in this song";
+"ui.player.quality_switch_failed" = "Couldn’t switch quality";
 "ui.player.playback_quality" = "Playback Quality";
 "ui.player.quality_hint" = "Tap to adjust quality for the current song";
 "ui.player.volume" = "Player Volume";

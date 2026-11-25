@@ -1,44 +1,48 @@
 import Foundation
 
 nonisolated enum LXQualityMapping {
-    /// 把 MeloX 的 7 档音质映射为 LX/QQ 的 quality 标识。
-    /// 返回值按优先级从高到低排列，供自动降级使用。
-    static func preference(for quality: MusicQuality) -> [String] {
+    /// What a file on QQ's CDN is, read from its name.
+    enum FileKind: Equatable, Sendable {
+        case tier(MusicQuality)
+        /// The short preview QQ serves in place of a song.
+        case trialClip
+        /// A container or cipher the player cannot decode.
+        case undecodable
+    }
+
+    /// QQ's tiers from `quality` downward, one step at a time. A song that
+    /// lacks the chosen tier plays the next one in this order.
+    static func ladder(from quality: MusicQuality) -> [MusicQuality] {
+        let tiers = MusicQuality.allCases
+        guard let index = tiers.firstIndex(of: quality) else {
+            return [quality]
+        }
+        return Array(tiers[...index].reversed())
+    }
+
+    /// The names LX sources use for a tier, preferred first.
+    static func sourceNames(for quality: MusicQuality) -> [String] {
         switch quality {
-        case .standard:
-            ["128k"]
-        case .high:
-            ["320k", "128k"]
-        case .lossless:
-            ["flac", "320k", "128k"]
-        case .hiResolution:
-            ["hires", "flac24bit", "flac", "320k", "128k"]
-        case .highDefinitionSurround:
-            ["atmos", "flac24bit", "flac", "320k", "128k"]
-        case .immersiveSurround:
-            ["atmos_plus", "atmos", "flac24bit", "flac", "320k", "128k"]
-        case .ultraClearMaster:
-            ["master", "flac24bit", "flac", "320k", "128k"]
+        case .standard: ["128k"]
+        case .high: ["320k"]
+        case .lossless: ["flac"]
+        case .hiResolution: ["hires", "flac24bit"]
+        case .highDefinitionSurround: ["atmos"]
+        case .immersiveSurround: ["atmos_plus"]
+        case .ultraClearMaster: ["master"]
         }
     }
 
-    static func candidates(
+    /// The names to ask one source for, given what it declares. A source
+    /// that declares nothing is asked for every name.
+    static func sourceNames(
         for quality: MusicQuality,
-        supported: [String]
+        declared: [String]
     ) -> [String] {
-        let preference = preference(for: quality)
-
-        let declared = Set(supported.map { $0.lowercased() })
-        guard !declared.isEmpty else { return preference }
-
-        let filtered = preference.filter { declared.contains($0) }
-        if !filtered.isEmpty { return filtered }
-        // 请求档位与源声明没有交集时，退回源声明中的第一个可用档位，
-        // 避免向源请求它明确不支持的音质。
-        let fallback = supported
-            .map { $0.lowercased() }
-            .first { !$0.isEmpty }
-        return fallback.map { [$0] } ?? preference
+        let names = sourceNames(for: quality)
+        let declared = Set(declared.map { $0.lowercased() })
+        guard !declared.isEmpty else { return names }
+        return names.filter(declared.contains)
     }
 
     static func quality(for value: String) -> MusicQuality? {
@@ -55,26 +59,36 @@ nonisolated enum LXQualityMapping {
     }
 
     /// A source reports the tier it was asked for, not the file it found.
-    /// QQ's own CDN names files by encoding, so a stream served from there
-    /// tells what is really playing.
-    static func verifiedQuality(for url: URL) -> MusicQuality? {
-        guard let host = url.host?.lowercased(),
-              host.hasSuffix("qq.com") || host.contains("qqmusic") else {
-            return nil
+    /// QQ names its files by encoding, a four-character code followed by
+    /// the media id, so the name tells what a URL really serves.
+    static func fileKind(for url: URL) -> FileKind? {
+        let pathExtension = url.pathExtension.lowercased()
+        if undecodableExtensions.contains(pathExtension) {
+            return .undecodable
         }
         let name = url.deletingPathExtension().lastPathComponent
-        guard name.count > 12 else { return nil }
+        guard name.count >= 16,
+              name.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) })
+        else {
+            return nil
+        }
         switch name.prefix(4).uppercased() {
-        case "M500", "C200", "C400", "C600", "O400", "O600": return .standard
-        case "M800", "O800": return .high
-        case "F000": return .lossless
-        case "RS01": return .hiResolution
-        case "Q000": return .highDefinitionSurround
-        case "Q001": return .immersiveSurround
-        case "AI00": return .ultraClearMaster
+        case "M500", "C200", "C400", "C600": return .tier(.standard)
+        case "M800": return .tier(.high)
+        case "F000": return .tier(.lossless)
+        case "RS01": return .tier(.hiResolution)
+        case "Q000": return .tier(.highDefinitionSurround)
+        case "Q001": return .tier(.immersiveSurround)
+        case "AI00": return .tier(.ultraClearMaster)
+        case "RS02", "O802": return .trialClip
         default: return nil
         }
     }
+
+    /// Ogg and QQ's encrypted containers have no decoder on this platform.
+    private static let undecodableExtensions: Set<String> = [
+        "ogg", "mgg", "mflac", "mmp4", "mnac", "nac", "ape", "wma",
+    ]
 
     static func rank(of quality: MusicQuality?) -> Int {
         quality.flatMap(MusicQuality.allCases.firstIndex(of:)) ?? -1
@@ -88,28 +102,17 @@ nonisolated enum LXQualityMapping {
         }
     }
 
-    static func bitrate(for quality: String) -> Int? {
-        switch quality.lowercased() {
-        case "128k": 128_000
-        case "320k": 320_000
-        default: nil
-        }
-    }
-
-    static func format(for url: URL, quality: String) -> String? {
+    static func format(for url: URL, quality: MusicQuality) -> String? {
         let pathExtension = url.pathExtension.lowercased()
         if !pathExtension.isEmpty {
             return pathExtension
         }
-        switch quality.lowercased() {
-        case "128k", "320k":
+        switch quality {
+        case .standard, .high:
             return "mp3"
-        case "flac", "flac24bit", "hires", "master":
+        case .lossless, .hiResolution, .highDefinitionSurround,
+             .immersiveSurround, .ultraClearMaster:
             return "flac"
-        case "atmos", "atmos_plus":
-            return "ogg"
-        default:
-            return nil
         }
     }
 }

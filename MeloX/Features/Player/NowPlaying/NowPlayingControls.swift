@@ -130,21 +130,24 @@ private struct NowPlayingAutoMixStatus: View {
     }
 }
 
+/// The quality pill under the scrubber. Its label is the tier that is
+/// playing; the checkmark in its menu is the tier the listener chose. The
+/// two differ for a song that lacks the chosen tier.
 private struct NowPlayingQualityMenu: View {
     @Environment(PlayerStore.self) private var player
     @Environment(AppSettings.self) private var settings
-    @Environment(NeteaseAPI.self) private var api
 
     var body: some View {
         Menu {
-            if player.availablePlaybackQualities.isEmpty {
+            let options = player.playbackQualityOptions
+            if options.isEmpty {
                 Text("ui.player.loading_quality")
-            } else {
-                Picker("ui.player.quality", selection: qualityBinding) {
-                    ForEach(player.availablePlaybackQualities) { quality in
-                        Text(quality.title).tag(quality)
-                    }
+            } else if let downgradeSummary {
+                Section(downgradeSummary) {
+                    qualityOptions(options)
                 }
+            } else {
+                qualityOptions(options)
             }
         } label: {
             HStack(spacing: 5) {
@@ -173,16 +176,40 @@ private struct NowPlayingQualityMenu: View {
     }
 
     private var displayedQualityTitle: String {
-        player.effectivePlaybackQuality?.title ?? L10n.string("ui.player.quality")
+        player.effectivePlaybackQuality.map(settings.title(for:))
+            ?? L10n.string("ui.player.quality")
     }
 
-    private var qualityBinding: Binding<MusicQuality> {
-        Binding(
-            // Mark what is actually playing; the requested tier only
-            // stands in while the stream is still being resolved.
-            get: { player.effectivePlaybackQuality ?? api.playbackQuality },
-            set: { player.selectSessionPlaybackQuality($0) }
+    /// Names the tier that is playing in place of the chosen one.
+    private var downgradeSummary: String? {
+        guard let playing = player.effectivePlaybackQuality,
+              playing != player.preferredPlaybackQuality else {
+            return nil
+        }
+        return L10n.format(
+            "ui.player.quality_downgraded",
+            settings.title(for: player.preferredPlaybackQuality),
+            settings.title(for: playing)
         )
+    }
+
+    /// One row per tier, the chosen one checked. Rows are toggles rather
+    /// than a picker's options so that each can carry a second line; a
+    /// picker turns a second line into an option of its own.
+    private func qualityOptions(_ options: [MusicQuality]) -> some View {
+        ForEach(options) { quality in
+            Toggle(
+                isOn: Binding(
+                    get: { quality == player.preferredPlaybackQuality },
+                    set: { _ in player.selectSessionPlaybackQuality(quality) }
+                )
+            ) {
+                Text(settings.title(for: quality))
+                if player.currentSongOffers(quality) == false {
+                    Text("ui.player.quality_not_in_song")
+                }
+            }
+        }
     }
 }
 

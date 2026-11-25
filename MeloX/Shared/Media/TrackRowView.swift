@@ -114,10 +114,8 @@ struct TrackRowView: View {
                     }
                 } else {
                     Menu {
-                        ForEach(MusicQuality.allCases) { quality in
-                            Button(quality.title) {
-                                downloads.start(song, quality: quality)
-                            }
+                        DownloadQualityButtons { quality in
+                            downloads.start(song, quality: quality)
                         }
                     } label: {
                         Label("ui.downloads.download_song", systemImage: "arrow.down.circle")

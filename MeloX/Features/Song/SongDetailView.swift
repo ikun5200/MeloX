@@ -40,10 +40,8 @@ struct SongDetailView: View {
                             }
                         } else {
                             Section("ui.downloads.select_quality") {
-                                ForEach(MusicQuality.allCases) { quality in
-                                    Button(quality.title) {
-                                        downloads.start(song, quality: quality)
-                                    }
+                                DownloadQualityButtons { quality in
+                                    downloads.start(song, quality: quality)
                                 }
                             }
                         }

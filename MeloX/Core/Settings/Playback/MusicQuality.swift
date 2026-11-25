@@ -31,6 +31,37 @@ nonisolated enum MusicQuality:
         }
     }
 
+    /// Apple Music's three options, as QQ tiers. High Quality is its
+    /// lossy tier, Lossless is CD-grade, and Hi-Res Lossless is 24-bit up
+    /// to 192 kHz from the label's master, which on QQ is Hi-Res. QQ's
+    /// surround and master tiers have no counterpart among the three.
+    static let appleMusicOptions: [MusicQuality] = [
+        .high, .lossless, .hiResolution,
+    ]
+
+    /// The name Apple Music gives the tier, where it has one.
+    var appleMusicTitle: String {
+        switch self {
+        case .high: L10n.string("ui.settings.audio_quality.apple.high")
+        case .lossless: L10n.string("ui.settings.audio_quality.apple.lossless")
+        case .hiResolution: L10n.string("ui.settings.audio_quality.apple.hi_res")
+        case .standard, .highDefinitionSurround, .immersiveSurround,
+             .ultraClearMaster:
+            title
+        }
+    }
+
+    /// The nearest of Apple Music's three options.
+    var appleMusicEquivalent: MusicQuality {
+        switch self {
+        case .standard, .high: .high
+        case .lossless: .lossless
+        case .hiResolution, .highDefinitionSurround, .immersiveSurround,
+             .ultraClearMaster:
+            .hiResolution
+        }
+    }
+
     var apiLevel: String {
         switch self {
         case .standard: "standard"

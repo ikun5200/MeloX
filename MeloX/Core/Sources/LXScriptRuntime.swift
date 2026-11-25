@@ -213,7 +213,8 @@ nonisolated final class LXScriptRuntime: @unchecked Sendable {
     func resolveMusicURL(
         musicInfo: [String: Any],
         quality: String,
-        source: String = "tx"
+        source: String = "tx",
+        timeout: TimeInterval = 20
     ) async throws -> String {
         guard descriptor != nil, !isShutdown else {
             throw LXScriptError.notInitialized
@@ -251,14 +252,13 @@ nonisolated final class LXScriptRuntime: @unchecked Sendable {
                         result: ""
                     )
                 }
-                self.queue.asyncAfter(deadline: .now() + 20) {
-                    guard self.musicContinuations[requestID] != nil else {
+                self.queue.asyncAfter(deadline: .now() + timeout) {
+                    guard let continuation = self.musicContinuations
+                        .removeValue(forKey: requestID) else {
                         return
                     }
-                    self.finishMusicRequest(
-                        requestID,
-                        error: "音乐地址解析超时",
-                        result: ""
+                    continuation.resume(
+                        throwing: LXScriptError.requestTimedOut
                     )
                 }
             }

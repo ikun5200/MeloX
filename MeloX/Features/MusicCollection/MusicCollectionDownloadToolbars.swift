@@ -7,11 +7,7 @@ struct MusicCollectionDownloadMenuContent: View {
 
     var body: some View {
         Menu {
-            ForEach(MusicQuality.allCases) { quality in
-                Button(quality.title) {
-                    onDownloadAll(quality)
-                }
-            }
+            DownloadQualityButtons(action: onDownloadAll)
         } label: {
             Label(
                 L10n.format("ui.downloads.download_all_count", downloadableSongCount),
@@ -87,11 +83,7 @@ struct MusicCollectionDownloadSelectionToolbar: ToolbarContent {
                     )
             } else {
                 Menu {
-                    ForEach(MusicQuality.allCases) { quality in
-                        Button(quality.title) {
-                            onDownloadSelection(quality)
-                        }
-                    }
+                    DownloadQualityButtons(action: onDownloadSelection)
                 } label: {
                     Label(
                         L10n.format("ui.downloads.download_selected_count", selectedDownloadCount),

@@ -15,7 +15,7 @@ struct PlaybackSettingsView: View {
                             including: settings.quality
                         )
                     ) { quality in
-                        Text(quality.title).tag(quality)
+                        Text(settings.title(for: quality)).tag(quality)
                     }
                 }
 
@@ -28,10 +28,28 @@ struct PlaybackSettingsView: View {
                             including: settings.cellularQuality
                         )
                     ) { quality in
-                        Text(quality.title).tag(quality)
+                        Text(settings.title(for: quality)).tag(quality)
                     }
                 }
 
+                Toggle(
+                    "ui.settings.playback.apple_music_quality",
+                    isOn: Binding(
+                        get: { settings.usesAppleMusicQualityOptions },
+                        set: { player.setUsesAppleMusicQualityOptions($0) }
+                    )
+                )
+            } header: {
+                Text("ui.settings.playback.section.quality")
+            } footer: {
+                Text(
+                    settings.usesAppleMusicQualityOptions
+                        ? "ui.settings.playback.quality.apple_footer"
+                        : "ui.settings.playback.quality.rule_footer"
+                )
+            }
+
+            Section {
                 Picker(
                     "ui.settings.playback.volume_control",
                     selection: $settings.playerVolumeControlMode
@@ -43,12 +61,7 @@ struct PlaybackSettingsView: View {
             } header: {
                 Text("ui.settings.playback.section.playback")
             } footer: {
-                Text(
-                    L10n.format(
-                        "ui.settings.playback.quality.footer",
-                        settings.playerVolumeControlMode.description
-                    )
-                )
+                Text(settings.playerVolumeControlMode.description)
             }
 
             Section {

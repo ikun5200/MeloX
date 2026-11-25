@@ -131,8 +131,15 @@ open class AudioPlayer {
 
     /// The underlying `AVAudioEngine` object
     private let audioEngine: AVAudioEngine
-    /// An `AVAudioUnit` object that represents the audio player
-    private(set) var player = AVAudioUnit()
+    /// Guards the output unit, which the system hands over on a thread of
+    /// its own choosing while the queues below may already be using it.
+    private let outputUnitLock = UnfairLock()
+    /// The `AVAudioUnit` that drives the hardware, once it exists and has
+    /// accepted the output format.
+    private var outputUnit: AVAudioUnit?
+    private var outputUnitFailed = false
+    /// Set when playback was asked to start before the unit arrived.
+    private var startsWhenOutputUnitArrives = false
     /// An `AVAudioUnitTimePitch` that controls the playback rate of the audio engine
     private let rateNode = AVAudioUnitTimePitch()
 
@@ -195,6 +202,8 @@ open class AudioPlayer {
     }
 
     deinit {
+        // The render callback reads the buffers freed below.
+        readyOutputUnit?.auAudioUnit.stopHardware()
         playerContext.audioPlayingEntry?.close()
         clearQueue()
         rendererContext.clean()
@@ -531,10 +540,34 @@ open class AudioPlayer {
             guard let self = self else { return }
             switch result {
             case let .success(unit):
-                self.player = unit
-                self.playerRenderProcessor.attachCallback(on: unit, audioFormat: self.outputAudioFormat)
+                // A unit that refuses the format keeps buffers of another
+                // layout. Rendering into them would write out of bounds, so
+                // this player reports that it cannot play instead.
+                guard self.playerRenderProcessor.attachCallback(on: unit, audioFormat: self.outputAudioFormat) else {
+                    self.outputUnitLock.withLock {
+                        self.outputUnitFailed = true
+                        self.startsWhenOutputUnitArrives = false
+                    }
+                    self.raiseUnexpected(error: .audioSystemError(.playerNotFound))
+                    return
+                }
+                let startsNow: Bool = self.outputUnitLock.withLock {
+                    self.outputUnit = unit
+                    let startsNow = self.startsWhenOutputUnitArrives
+                    self.startsWhenOutputUnitArrives = false
+                    return startsNow
+                }
+                if startsNow {
+                    self.sourceQueue.async { [weak self] in
+                        self?.startOutputUnit(unit)
+                    }
+                }
             case let .failure(error):
-                assertionFailure("couldn't create player unit: \(error)")
+                Logger.error("couldn't create player unit: %@", category: .generic, args: error.localizedDescription)
+                self.outputUnitLock.withLock {
+                    self.outputUnitFailed = true
+                    self.startsWhenOutputUnitArrives = false
+                }
                 self.raiseUnexpected(error: .audioSystemError(.playerNotFound))
             }
         }
@@ -621,12 +654,40 @@ open class AudioPlayer {
         Logger.debug("engine started 🛵", category: .generic)
     }
 
+    /// The output unit, once the system has created it.
+    private var readyOutputUnit: AVAudioUnit? {
+        outputUnitLock.withLock { outputUnit }
+    }
+
+    /// Stops the hardware and forgets a start that was still waiting for
+    /// the output unit.
+    private func stopOutputUnit() {
+        let unit: AVAudioUnit? = outputUnitLock.withLock {
+            startsWhenOutputUnitArrives = false
+            return outputUnit
+        }
+        unit?.auAudioUnit.stopHardware()
+    }
+
+    private func startOutputUnit(_ unit: AVAudioUnit) {
+        // Stopped, paused or failed while the unit was being created.
+        let state = playerContext.internalState
+        guard state.contains(.running), state != .paused else { return }
+        do {
+            try unit.auAudioUnit.allocateRenderResources()
+            try unit.auAudioUnit.startHardware()
+        } catch {
+            stopEngine(reason: .error)
+            raiseUnexpected(error: .audioSystemError(.playerStartError))
+        }
+    }
+
     /// Pauses the audio engine and stops the player's hardware
     private func pauseEngine() {
         guard isEngineRunning else { return }
         audioEngine.reset()
         audioEngine.pause()
-        player.auAudioUnit.stopHardware()
+        stopOutputUnit()
         Logger.debug("engine paused ⏸", category: .generic)
     }
 
@@ -635,7 +696,7 @@ open class AudioPlayer {
     /// - parameter reason: A value of `AudioPlayerStopReason` indicating the reason the engine stopped.
     private func stopEngine(reason: AudioPlayerStopReason) {
         audioEngine.stop()
-        player.auAudioUnit.stopHardware()
+        stopOutputUnit()
         rendererContext.resetBuffers()
         playerContext.setInternalState(to: .stopped)
         playerContext.stopReason.write { $0 = reason }
@@ -651,8 +712,20 @@ open class AudioPlayer {
         }
         do {
             try startEngineIfNeeded()
-            try player.auAudioUnit.allocateRenderResources()
-            try player.auAudioUnit.startHardware()
+            // The unit is created asynchronously. A stream that is ready
+            // first, as a local file is, starts once it arrives.
+            let (unit, failed): (AVAudioUnit?, Bool) = outputUnitLock.withLock {
+                if outputUnit == nil, !outputUnitFailed {
+                    startsWhenOutputUnitArrives = true
+                }
+                return (outputUnit, outputUnitFailed)
+            }
+            if failed {
+                throw AudioPlayerError.audioSystemError(.playerNotFound)
+            }
+            guard let unit else { return }
+            try unit.auAudioUnit.allocateRenderResources()
+            try unit.auAudioUnit.startHardware()
         } catch {
             stopEngine(reason: .error)
             raiseUnexpected(error: .audioSystemError(.playerStartError))

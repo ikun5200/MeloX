@@ -127,7 +127,7 @@ class AudioEntry {
 
     func duration() -> Double {
         lock.lock()
-        guard sampleRate > 0 else {
+        guard sampleRate > 0, audioStreamFormat.mSampleRate > 0 else {
             lock.unlock()
             return 0
         }
@@ -157,8 +157,12 @@ class AudioEntry {
         if let byteCount = audioStreamState.dataByteCount {
             return UInt(byteCount)
         }
-        guard source.length > 0 else { return 0 }
-        return UInt(source.length) - UInt(audioStreamState.dataOffset)
+        // A server that answers the two-byte probe with a short length
+        // reports fewer bytes than the header before the audio occupies.
+        let length = UInt64(max(source.length, 0))
+        let offset = audioStreamState.dataOffset
+        guard length > offset else { return 0 }
+        return UInt(length - offset)
     }
 }
 

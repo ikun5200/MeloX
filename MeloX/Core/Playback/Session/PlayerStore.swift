@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import OSLog
+import UIKit
 
 private enum LyricsLiveActivityPublication: Equatable {
     case inactive
@@ -61,12 +62,14 @@ final class PlayerStore {
         PlaybackBeatTimeline?
     private(set) var beatAnalysisStatus:
         PlaybackBeatAnalysisStatus = .idle
+    /// The tier of the stream that is playing. It is lower than
+    /// `preferredPlaybackQuality` for a song that lacks the chosen tier.
     private(set) var effectivePlaybackQuality: MusicQuality?
-    /// True while a quality picked in the player is being fetched. The
-    /// current stream keeps playing until the new one is ready.
+    /// True while a newly chosen quality is being fetched. The current
+    /// stream keeps playing until the new one is ready.
     private(set) var isSwitchingPlaybackQuality = false
-    /// A short message shown in place of the quality label, for a pick that
-    /// could not be honoured.
+    /// A short message shown in place of the quality label, for a choice
+    /// this song cannot honour.
     private(set) var playbackQualityNotice: String?
     private(set) var sleepTimer: PlaybackSleepTimer
 
@@ -74,29 +77,25 @@ final class PlayerStore {
         engine.audioSpectrumSnapshot
     }
 
-    var availablePlaybackQualities: [MusicQuality] {
+    /// The quality the listener chose. It stands for every song: one that
+    /// lacks it plays the next tier down, and the song after starts from
+    /// this choice again.
+    var preferredPlaybackQuality: MusicQuality {
+        api.playbackQuality
+    }
+
+    /// The tiers the player's quality menu lists.
+    var playbackQualityOptions: [MusicQuality] {
         guard currentSong != nil else { return [] }
-        let sourceQualities = api.sourcePlaybackQualities
-        if !sourceQualities.isEmpty {
-            // Offer what a source can fetch and this song actually has.
-            // The playing tier stays listed: a downloaded file can be one
-            // that no source declares.
-            return MusicQuality.allCases.filter { quality in
-                if quality == effectivePlaybackQuality { return true }
-                return sourceQualities.contains(quality)
-                    && currentSongAudioAvailability.supports(quality)
-                        != false
-            }
-        }
-        guard !isResolvingCurrentSongAudioAvailability else { return [] }
-        if currentSongAudioAvailability.isKnown {
-            return MusicQuality.allCases.filter { quality in
-                currentSongAudioAvailability.supports(
-                    apiLevel: quality.apiLevel
-                ) == true || quality == effectivePlaybackQuality
-            }
-        }
-        return effectivePlaybackQuality.map { [$0] } ?? []
+        return selectablePlaybackQualities(
+            including: preferredPlaybackQuality
+        )
+    }
+
+    /// Whether the playing song has a file at `quality`. `nil` while QQ has
+    /// not said.
+    func currentSongOffers(_ quality: MusicQuality) -> Bool? {
+        currentSongAudioAvailability.supports(quality)
     }
 
     private var playbackQueue = PlaybackQueue()
@@ -239,8 +238,22 @@ final class PlayerStore {
     @ObservationIgnored
     private var currentLoadShouldAutoplay = false
 
-    /// Engine failures retried for this song before the unavailable alert.
+    /// Streams given up on for this song since it last produced sound.
+    /// Each one is a different source or tier, so the count is bounded by
+    /// how many of those there are; the limit only guards against a loop.
     private var playbackRecoveryAttempts = 0
+
+    private static let maximumPlaybackRecoveryAttempts = 12
+
+    /// True once the current stream has produced sound. One that ends
+    /// without having done so was not audio.
+    @ObservationIgnored
+    private var currentStreamHasPlayed = false
+
+    /// How long the engine found the current stream to be, which for a
+    /// preview clip is far shorter than the song.
+    @ObservationIgnored
+    private var currentStreamDuration: TimeInterval?
 
     @ObservationIgnored
     private var currentPlaybackSource: PlaybackSource?
@@ -269,6 +282,19 @@ final class PlayerStore {
 
     @ObservationIgnored
     private var resolvedAudioAvailability: [Int: SongAudioAvailability] = [:]
+
+    @ObservationIgnored
+    private var audioAvailabilityFetches: [Int: Task<Void, Never>] = [:]
+
+    @ObservationIgnored
+    private var playbackIssueDismissTask: Task<Void, Never>?
+
+    /// The upcoming song whose stream was fetched before this one ended.
+    @ObservationIgnored
+    private var prefetchedNextSongID: Int?
+
+    @ObservationIgnored
+    private var nextSourcePrefetchTask: Task<Void, Never>?
 
     @ObservationIgnored
     private var nowPlayingLyricsSongID: Int?
@@ -497,7 +523,7 @@ final class PlayerStore {
 
         currentLoadShouldAutoplay = shouldPlay
         if shouldPlay {
-            playbackIssue = nil
+            dismissPlaybackIssue()
             engine.play()
         } else {
             engine.pause()
@@ -648,7 +674,7 @@ final class PlayerStore {
     private func setLocalPlaybackIntent(_ shouldPlay: Bool) {
         currentLoadShouldAutoplay = shouldPlay
         if shouldPlay {
-            playbackIssue = nil
+            dismissPlaybackIssue()
             engine.play()
         } else {
             engine.pause()
@@ -660,6 +686,7 @@ final class PlayerStore {
 
     func retry() async {
         guard currentSong != nil else { return }
+        playbackRecoveryAttempts = 0
         await loadCurrentSong(
             autoplay: true,
             startAt: estimatedProgress(),
@@ -668,14 +695,52 @@ final class PlayerStore {
     }
 
     func dismissPlaybackIssue() {
+        playbackIssueDismissTask?.cancel()
+        playbackIssueDismissTask = nil
         playbackIssue = nil
     }
 
-    /// The tiers worth offering in a quality picker: what the enabled
-    /// sources declare, plus the current choice so it stays visible.
+    /// Tells the listener a song could not be played, for a few seconds.
+    private func reportPlaybackIssue(_ issue: PlaybackIssue) {
+        playbackIssue = issue
+        UIAccessibility.post(
+            notification: .announcement,
+            argument: issue.message
+        )
+        playbackIssueDismissTask?.cancel()
+        playbackIssueDismissTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(6))
+            guard !Task.isCancelled,
+                  self?.playbackIssue?.id == issue.id else {
+                return
+            }
+            self?.playbackIssue = nil
+        }
+    }
+
+    /// A notice about one song has nothing left to say once that song is
+    /// loading or playing again.
+    private func clearPlaybackIssue(forSongID songID: Int?) {
+        guard let issue = playbackIssue, issue.songID == songID else {
+            return
+        }
+        dismissPlaybackIssue()
+    }
+
+    /// The tiers worth offering in a quality picker. Apple Music's three
+    /// options are always all there; of QQ's seven, those an enabled source
+    /// declares, plus the current choice so it stays visible.
     func selectablePlaybackQualities(
         including selected: MusicQuality
     ) -> [MusicQuality] {
+        if settings.usesAppleMusicQualityOptions {
+            let options = MusicQuality.appleMusicOptions
+            return options.contains(selected)
+                ? options
+                : MusicQuality.allCases.filter {
+                    options.contains($0) || $0 == selected
+                }
+        }
         let sourceQualities = api.sourcePlaybackQualities
         guard !sourceQualities.isEmpty else { return MusicQuality.allCases }
         return MusicQuality.allCases.filter {
@@ -683,48 +748,43 @@ final class PlayerStore {
         }
     }
 
+    /// Changes the standing quality for Wi-Fi or cellular in Settings.
     func selectPlaybackQuality(_ quality: MusicQuality, forCellularData: Bool? = nil) {
         let targetsCellularData = forCellularData ?? api.isCellularData
+        let formerPreference = preferredPlaybackQuality
+        // A choice made in Settings replaces one made in the player.
         api.clearSessionPlaybackQuality()
-        let currentQuality = targetsCellularData
-            ? settings.cellularQuality
-            : settings.quality
-        guard currentQuality != quality else { return }
-        let shouldAutoplay = isPlaying
-            || (isLoading && currentLoadShouldAutoplay)
-        let resumePosition = engine.currentPlaybackTime
-            ?? estimatedProgress()
-        let songID = currentSong?.id
         if targetsCellularData {
             settings.cellularQuality = quality
         } else {
             settings.quality = quality
         }
-        guard targetsCellularData == api.isCellularData, let songID else { return }
-        seekRevision += 1
-        let qualityChangeRevision = seekRevision
-        Task { @MainActor [weak self] in
-            guard let self,
-                  self.currentSong?.id == songID else { return }
-            let startPosition =
-                self.seekRevision == qualityChangeRevision
-                ? resumePosition
-                : self.estimatedProgress()
-            await self.loadCurrentSong(
-                autoplay: shouldAutoplay,
-                startAt: startPosition
-            )
+        guard preferredPlaybackQuality != formerPreference else { return }
+        applyPreferredQualityToCurrentSong(refreshingSource: false)
+    }
+
+    /// Switches between QQ's seven tiers and Apple Music's three options.
+    func setUsesAppleMusicQualityOptions(_ isEnabled: Bool) {
+        guard settings.usesAppleMusicQualityOptions != isEnabled else {
+            return
         }
+        let formerPreference = preferredPlaybackQuality
+        if isEnabled {
+            // A tier picked in the player may not be one of the three.
+            api.clearSessionPlaybackQuality()
+        }
+        settings.usesAppleMusicQualityOptions = isEnabled
+        guard preferredPlaybackQuality != formerPreference else { return }
+        applyPreferredQualityToCurrentSong(refreshingSource: false)
     }
 
     /// Quality changes made from the Now Playing screen are scoped to this
     /// app session. The persistent defaults in Settings are untouched, so a
     /// fresh launch returns to the Wi-Fi/cellular quality configured there.
     func selectSessionPlaybackQuality(_ quality: MusicQuality) {
-        let targetsCellularData = api.isCellularData
-        // Picking the requested tier again after a downgrade asks the
-        // sources once more instead of replaying the cached answer.
-        let isRetry = api.playbackQuality == quality
+        // Choosing the standing tier again, for a song playing below it,
+        // asks the sources once more instead of replaying their answer.
+        let isRetry = preferredPlaybackQuality == quality
         guard !isRetry
                 || (effectivePlaybackQuality != nil
                     && effectivePlaybackQuality != quality) else {
@@ -732,9 +792,20 @@ final class PlayerStore {
         }
         api.setSessionPlaybackQuality(
             quality,
-            forCellularData: targetsCellularData
+            forCellularData: api.isCellularData
         )
+        applyPreferredQualityToCurrentSong(refreshingSource: isRetry)
+    }
+
+    /// Brings the playing song in line with the chosen quality.
+    ///
+    /// The new stream is fetched while the current one keeps playing, and
+    /// playback moves over only once a stream exists. A song without the
+    /// chosen tier gets the next one down that QQ has; if that is what is
+    /// already playing, nothing is touched.
+    private func applyPreferredQualityToCurrentSong(refreshingSource: Bool) {
         guard let song = currentSong else { return }
+        let preference = preferredPlaybackQuality
 
         guard api.isUsingSourceResolver, !song.mid.isEmpty else {
             let shouldAutoplay = isPlaying
@@ -758,32 +829,40 @@ final class PlayerStore {
             return
         }
 
-        // Fetch the new stream first and swap only once it exists. Tearing
-        // playback down before knowing whether the sources can serve the
-        // tier left the song silent, and a failure skipped to the next one.
         qualitySwitchTask?.cancel()
         playbackQualityNotice = nil
         isSwitchingPlaybackQuality = true
         qualitySwitchTask = Task { @MainActor [weak self] in
             guard let self else { return }
+            let availability = await audioAvailabilityForResolution(of: song)
             let source = try? await api.playbackSource(
                 for: song,
-                quality: quality,
-                availability: knownAudioAvailability(for: song),
-                refreshingSource: isRetry
+                quality: preference,
+                availability: availability,
+                refreshingSource: refreshingSource
             )
             guard !Task.isCancelled else { return }
             qualitySwitchTask = nil
             isSwitchingPlaybackQuality = false
             guard currentSong?.id == song.id else { return }
-            guard let source,
-                  source.quality != effectivePlaybackQuality else {
+            guard let source else {
+                showPlaybackQualityNotice(
+                    L10n.string("ui.player.quality_switch_failed")
+                )
+                return
+            }
+
+            if source.quality != preference {
                 showPlaybackQualityNotice(
                     L10n.format(
                         "ui.player.quality_unavailable",
-                        quality.title
+                        settings.title(for: preference)
                     )
                 )
+            }
+            // The song is already playing the tier it would be moved to.
+            if source.quality == effectivePlaybackQuality,
+               engine.hasCurrentItem {
                 return
             }
 
@@ -823,6 +902,47 @@ final class PlayerStore {
             return song.audioAvailability
         }
         return resolvedAudioAvailability[song.id] ?? .unknown
+    }
+
+    /// Asks QQ which encodings `song` has, for a song that came from a list
+    /// without them. One request serves everyone who asks meanwhile.
+    private func fetchAudioAvailabilityIfNeeded(for song: Song) {
+        guard api.isUsingSourceResolver,
+              !song.mid.isEmpty,
+              !knownAudioAvailability(for: song).isKnown,
+              audioAvailabilityFetches[song.id] == nil else {
+            return
+        }
+        audioAvailabilityFetches[song.id] = Task { @MainActor [weak self] in
+            guard let api = self?.api else { return }
+            let detailedSong = try? await api.songDetail(mid: song.mid)
+            guard let self else { return }
+            audioAvailabilityFetches[song.id] = nil
+            guard let availability = detailedSong?.audioAvailability,
+                  availability.isKnown else {
+                return
+            }
+            resolvedAudioAvailability[song.id] = availability
+            if currentSong?.id == song.id {
+                currentSongAudioAvailability = availability
+            }
+        }
+    }
+
+    /// What QQ says `song` has, waiting briefly for the answer when it is
+    /// not known yet. Knowing it spares every source a request for a tier
+    /// the song lacks, and lets a returned file be told from another.
+    private func audioAvailabilityForResolution(
+        of song: Song
+    ) async -> SongAudioAvailability {
+        fetchAudioAvailabilityIfNeeded(for: song)
+        let deadline = ContinuousClock.now + .milliseconds(1_500)
+        while audioAvailabilityFetches[song.id] != nil,
+              ContinuousClock.now < deadline,
+              !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(40))
+        }
+        return knownAudioAvailability(for: song)
     }
 
     func next() async {
@@ -1336,8 +1456,10 @@ final class PlayerStore {
         isPlaying = false
         isUsingDownloadedSource = false
         currentPlaybackSource = nil
+        currentStreamHasPlayed = false
+        currentStreamDuration = nil
         effectivePlaybackQuality = nil
-        playbackIssue = nil
+        clearPlaybackIssue(forSongID: song.id)
         if nowPlayingLyricsSongID != song.id {
             nowPlayingLyricsSongID = nil
             nowPlayingLyrics = []
@@ -1369,7 +1491,6 @@ final class PlayerStore {
             isResolvingSource = false
             currentPlaybackSource = source
             effectivePlaybackQuality = source.quality
-            consecutiveSourceFailures = 0
             let shouldAutoplay = currentLoadShouldAutoplay
             let resolvedStartPosition = estimatedProgress()
             await engine.load(
@@ -1384,10 +1505,18 @@ final class PlayerStore {
             isResolvingSource = false
             isLoading = false
             isPlaying = false
-            consecutiveSourceFailures += 1
-            playbackIssue = PlaybackIssue(song: song, error: error)
             updateNowPlayingState()
             persistSnapshot()
+
+            // Without a connection every song would fail the same way.
+            // Skipping through the queue would only lose the listener's
+            // place in it.
+            guard api.isNetworkAvailable else {
+                reportPlaybackIssue(PlaybackIssue(offlineFor: song))
+                return
+            }
+            consecutiveSourceFailures += 1
+            reportPlaybackIssue(PlaybackIssue(song: song, error: error))
 
             // 洛雪源解析失败时提示并自动跳下一首；连续失败到队列长度后停止，
             // 避免在全部歌曲都不可解析时无限循环。
@@ -1444,7 +1573,9 @@ final class PlayerStore {
                     guard let downloadedSource else {
                         return try await api.playbackSource(
                             for: song,
-                            availability: knownAudioAvailability(for: song)
+                            availability: await audioAvailabilityForResolution(
+                                of: song
+                            )
                         )
                     }
                     return await streamedSource(
@@ -1484,7 +1615,7 @@ final class PlayerStore {
     ) async -> PlaybackSource {
         let streamed = try? await api.playbackSource(
             for: song,
-            availability: knownAudioAvailability(for: song)
+            availability: await audioAvailabilityForResolution(of: song)
         )
         // No stream, or one that had to downgrade to no better than the
         // saved file, is no reason to leave the file.
@@ -1516,6 +1647,9 @@ final class PlayerStore {
     }
 
     private func handlePlaybackEnded() async {
+        if await recoverFromTruncatedStream() {
+            return
+        }
         recordCurrentPlayback(completed: true)
         if repeatMode == .one {
             hasRecordedCurrentStart = false
@@ -1526,12 +1660,51 @@ final class PlayerStore {
         await moveToNext(recordingCurrentPlayback: false)
     }
 
+    /// A stream that ends long before the song does was a preview clip or
+    /// a file cut short, and one that ends without having made a sound was
+    /// not audio at all. A source can return either in place of the song.
+    /// Moving to the next song then would drop the rest of this one, so it
+    /// carries on from where the stream gave out, on another stream.
+    private func recoverFromTruncatedStream() async -> Bool {
+        guard api.isUsingSourceResolver,
+              !isUsingDownloadedSource,
+              let song = currentSong,
+              let source = currentPlaybackSource,
+              playbackRecoveryAttempts
+                < Self.maximumPlaybackRecoveryAttempts else {
+            return false
+        }
+        let expected = TimeInterval(song.durationMS) / 1_000
+        let endedAt = engine.currentPlaybackTime ?? estimatedProgress()
+        let reached = max(endedAt, currentStreamDuration ?? 0)
+        let endedSilent = !currentStreamHasPlayed
+            && endedAt < expected - 5
+        let endedShort = expected >= 30 && reached < expected * 0.6
+        guard endedSilent || endedShort else {
+            return false
+        }
+        playbackRecoveryAttempts += 1
+        api.reportUnplayable(source, for: song)
+        await loadCurrentSong(
+            autoplay: currentLoadShouldAutoplay || endedShort,
+            startAt: endedAt
+        )
+        return true
+    }
+
     private func handleEngineFailure(_ error: Error) async {
         if isResolvingSource {
             return
         }
+        let isItemFailure: Bool
         if let playbackError = error as? AudioPlaybackError,
-           case .itemFailed = playbackError,
+           case .itemFailed = playbackError {
+            isItemFailure = true
+        } else {
+            isItemFailure = false
+        }
+
+        if isItemFailure,
            isUsingDownloadedSource,
            let song = currentSong {
             let resumePosition = estimatedProgress()
@@ -1545,11 +1718,34 @@ final class PlayerStore {
             return
         }
 
-        if let playbackError = error as? AudioPlaybackError,
-           case .itemFailed = playbackError,
-           playbackRecoveryAttempts < 2,
-           currentSong != nil {
+        // Offline, another stream would fail the same way, and giving up
+        // on this one would only lower the quality once the connection is
+        // back. Playback waits where it is.
+        if isItemFailure,
+           !api.isNetworkAvailable,
+           let song = currentSong {
+            reportPlaybackIssue(PlaybackIssue(offlineFor: song))
+            isLoading = false
+            isPlaying = false
+            updateNowPlayingState()
+            engine.unload()
+            persistSnapshot()
+            return
+        }
+
+        if isItemFailure,
+           playbackRecoveryAttempts
+            < Self.maximumPlaybackRecoveryAttempts,
+           let song = currentSong {
             playbackRecoveryAttempts += 1
+            // The first failure may be the connection's, so the same stream
+            // gets one more try. After that it is given up on, and the
+            // sources are asked for another: a different source for the
+            // same tier, or the next tier down.
+            if let source = currentPlaybackSource,
+               playbackRecoveryAttempts > 1 {
+                api.reportUnplayable(source, for: song)
+            }
             let resumePosition = estimatedProgress()
             let shouldAutoplay = currentLoadShouldAutoplay
             await loadCurrentSong(
@@ -1560,14 +1756,13 @@ final class PlayerStore {
         }
 
         if let song = currentSong {
-            playbackIssue = PlaybackIssue(song: song, error: error)
+            reportPlaybackIssue(PlaybackIssue(song: song, error: error))
         }
         isLoading = false
         isPlaying = false
         updateNowPlayingState()
 
-        if let playbackError = error as? AudioPlaybackError,
-           case .itemFailed = playbackError {
+        if isItemFailure {
             engine.unload()
         }
         persistSnapshot()
@@ -1617,8 +1812,10 @@ final class PlayerStore {
                 self.isPlaying = true
                 self.isLoading = false
                 self.currentLoadShouldAutoplay = true
+                self.currentStreamHasPlayed = true
                 self.playbackRecoveryAttempts = 0
-                self.playbackIssue = nil
+                self.consecutiveSourceFailures = 0
+                self.clearPlaybackIssue(forSongID: self.currentSong?.id)
                 self.recordCurrentPlaybackStartIfNeeded()
                 self.scheduleBeatAnalysisIfNeeded()
                 self.prepareAutoMixIfNeeded()
@@ -1631,6 +1828,7 @@ final class PlayerStore {
         engine.onDurationChanged = { [weak self] value in
             guard let self else { return }
             self.duration = value
+            self.currentStreamDuration = value
             self.updateNowPlayingState()
         }
         engine.onPlaybackEnded = { [weak self] in
@@ -1705,8 +1903,42 @@ final class PlayerStore {
         if second != lastPersistedSecond {
             lastPersistedSecond = second
             persistence.saveProgress(measuredProgress)
+            prefetchNextSourceIfNeeded()
         }
         prepareAutoMixIfNeeded()
+    }
+
+    /// Fetches the next song's stream shortly before this one ends. Finding
+    /// one can mean asking several sources for several tiers; done ahead,
+    /// that wait is not a silence between two songs.
+    private func prefetchNextSourceIfNeeded() {
+        guard api.isUsingSourceResolver,
+              isPlaying,
+              repeatMode != .one,
+              playbackDurationLimit - progress <= 30,
+              let nextIndex = upcomingQueueIndices.first,
+              queue.indices.contains(nextIndex) else {
+            return
+        }
+        let nextSong = queue[nextIndex]
+        guard prefetchedNextSongID != nextSong.id,
+              !nextSong.mid.isEmpty,
+              downloads.localPlaybackSource(songID: nextSong.id) == nil else {
+            return
+        }
+        prefetchedNextSongID = nextSong.id
+        nextSourcePrefetchTask?.cancel()
+        nextSourcePrefetchTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let availability = await audioAvailabilityForResolution(
+                of: nextSong
+            )
+            guard !Task.isCancelled else { return }
+            _ = try? await api.playbackSource(
+                for: nextSong,
+                availability: availability
+            )
+        }
     }
 
     private func bindAutoMixCoordinator() {
@@ -2219,10 +2451,12 @@ final class PlayerStore {
         isUsingDownloadedSource =
             context.sourceIsDownloaded
         currentLoadShouldAutoplay = true
+        currentStreamHasPlayed = true
+        currentStreamDuration = nil
         isResolvingSource = false
         isLoading = engine.state == .loading
         isPlaying = engine.state == .playing
-        playbackIssue = nil
+        dismissPlaybackIssue()
         hasRecordedCurrentStart = false
         lastPersistedSecond = Int(progress)
         nowPlayingLyricsSongID = nil
@@ -2264,23 +2498,9 @@ final class PlayerStore {
             currentSongAudioAvailability = known
             isResolvingCurrentSongAudioAvailability = false
             audioAvailabilityTask = nil
-            guard !known.isKnown, !song.mid.isEmpty else { return }
             // Lists that omit the file sizes leave the tiers unknown; the
             // song detail has them.
-            audioAvailabilityTask = Task { @MainActor [weak self] in
-                guard let api = self?.api else { return }
-                let detailedSong = try? await api.songDetail(mid: song.mid)
-                guard let self,
-                      !Task.isCancelled,
-                      let availability = detailedSong?.audioAvailability,
-                      availability.isKnown else {
-                    return
-                }
-                resolvedAudioAvailability[song.id] = availability
-                if currentSong?.id == song.id {
-                    currentSongAudioAvailability = availability
-                }
-            }
+            fetchAudioAvailabilityIfNeeded(for: song)
             return
         }
         if let detailedSong = detailedPlaybackSongs[song.id] {
@@ -2319,3 +2539,25 @@ final class PlayerStore {
         }
     }
 }
+
+#if DEBUG && targetEnvironment(simulator)
+extension PlayerStore {
+    /// Silences the output while the rig drives playback. Nothing about how
+    /// playback proceeds depends on the volume.
+    func debugMuteOutput() {
+        engine.setVolume(0)
+    }
+
+    /// Raises a playback error with nothing else happening, to observe how
+    /// the interface alone reacts to one.
+    func debugRaisePlaybackIssue() {
+        guard let currentSong else { return }
+        reportPlaybackIssue(
+            PlaybackIssue(
+                song: currentSong,
+                error: APIError.noPlayableSource
+            )
+        )
+    }
+}
+#endif

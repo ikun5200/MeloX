@@ -117,6 +117,7 @@ final class AppSettings {
         static let qqCredential = "qqMusicCredential"
         static let quality = "musicQuality"
         static let cellularQuality = "cellularMusicQuality"
+        static let usesAppleMusicQualityOptions = "usesAppleMusicQualityOptions"
         static let playerVolumeControlMode = "playerVolumeControlMode"
         static let systemNowPlayingLyricsEnabled =
             "systemNowPlayingLyricsEnabled"
@@ -336,6 +337,36 @@ final class AppSettings {
                 forKey: Key.cellularQuality
             )
         }
+    }
+
+    /// Offers three quality options, named and ordered as Apple Music's,
+    /// in place of QQ's seven. Each stands for one QQ tier; see
+    /// `MusicQuality.appleMusicOptions`.
+    var usesAppleMusicQualityOptions: Bool {
+        didSet {
+            defaults.set(
+                usesAppleMusicQualityOptions,
+                forKey: Key.usesAppleMusicQualityOptions
+            )
+            guard usesAppleMusicQualityOptions else { return }
+            // A stored choice outside the three would show no selection.
+            quality = quality.appleMusicEquivalent
+            cellularQuality = cellularQuality.appleMusicEquivalent
+            automaticCacheQuality = automaticCacheQuality.appleMusicEquivalent
+        }
+    }
+
+    /// The tiers a quality picker lists.
+    var selectableMusicQualities: [MusicQuality] {
+        usesAppleMusicQualityOptions
+            ? MusicQuality.appleMusicOptions
+            : MusicQuality.allCases
+    }
+
+    func title(for quality: MusicQuality) -> String {
+        usesAppleMusicQualityOptions
+            ? quality.appleMusicTitle
+            : quality.title
     }
 
     var playerVolumeControlMode: PlayerVolumeControlMode {
@@ -1373,6 +1404,9 @@ final class AppSettings {
         cellularQuality = MusicQuality(
             rawValue: defaults.string(forKey: Key.cellularQuality) ?? ""
         ) ?? .high
+        usesAppleMusicQualityOptions = defaults.bool(
+            forKey: Key.usesAppleMusicQualityOptions
+        )
         playerVolumeControlMode = PlayerVolumeControlMode(
             rawValue: defaults.string(forKey: Key.playerVolumeControlMode) ?? ""
         ) ?? Self.defaultPlayerVolumeControlMode
@@ -2018,6 +2052,7 @@ final class AppSettings {
     }
 
     func resetPlayerSettings() {
+        usesAppleMusicQualityOptions = false
         quality = .high
         cellularQuality = .high
         playerVolumeControlMode = Self.defaultPlayerVolumeControlMode

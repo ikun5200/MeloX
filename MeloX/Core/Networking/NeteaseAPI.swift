@@ -59,6 +59,10 @@ final class NeteaseAPI {
 
     private(set) var isCellularData = false
 
+    /// False while the device has no route to the network at all.
+    @ObservationIgnored
+    private(set) var isNetworkAvailable = true
+
     @ObservationIgnored
     let client: NeteaseDirectClient
 
@@ -121,8 +125,10 @@ final class NeteaseAPI {
         )
         pathMonitor.pathUpdateHandler = { [weak self] path in
             let isCellular = path.usesInterfaceType(.cellular)
+            let isAvailable = path.status != .unsatisfied
             Task { @MainActor [weak self] in
                 self?.isCellularData = isCellular
+                self?.isNetworkAvailable = isAvailable
             }
         }
         pathMonitor.start(queue: DispatchQueue(label: "MeloX.NetworkMonitor"))
@@ -575,6 +581,12 @@ final class NeteaseAPI {
             quality: playbackQuality,
             availability: song.audioAvailability
         )
+    }
+
+    /// Tells the resolver the player could not play `source`, so the next
+    /// request for this song moves on instead of returning it again.
+    func reportUnplayable(_ source: PlaybackSource, for song: Song) {
+        resolver?.reportUnplayable(source, for: song)
     }
 
     private func playbackSource(

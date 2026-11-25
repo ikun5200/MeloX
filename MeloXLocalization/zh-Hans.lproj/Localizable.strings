@@ -52,6 +52,9 @@
 "ui.settings.audio_quality.hd_surround" = "高清环绕声";
 "ui.settings.audio_quality.immersive_surround" = "沉浸环绕声";
 "ui.settings.audio_quality.master" = "超清母带";
+"ui.settings.audio_quality.apple.high" = "高质量";
+"ui.settings.audio_quality.apple.lossless" = "无损";
+"ui.settings.audio_quality.apple.hi_res" = "高解析度无损";
 "ui.settings.volume_control.hidden" = "不显示";
 "ui.settings.volume_control.hidden.detail" = "播放器不显示音量滑杆，音量由系统控制。";
 "ui.settings.volume_control.independent" = "独立音量";
@@ -237,6 +240,9 @@
 "ui.error.playback.unavailable" = "《%@》可能因版权或地区限制，当前没有可用的播放地址。";
 "ui.error.playback.source_load_failed" = "《%@》的音源无法载入，可能因版权、地区限制或网络问题。";
 "ui.error.playback.failed" = "《%@》播放失败：%@";
+"ui.error.playback.no_stream" = "《%@》暂时没有可用的音源。";
+"ui.error.playback.no_source_enabled" = "还没有启用支持 QQ 音乐的音源，请先在设置中添加。";
+"ui.error.playback.offline" = "网络不可用，恢复后轻点播放即可继续。";
 "ui.error.playback.enable_failed" = "无法启用音频播放：%@";
 "ui.error.playback.audio_source_failed" = "音源载入失败：%@";
 "ui.error.playback.audio_source_retry" = "音源载入失败，请稍后重试。";
@@ -587,10 +593,13 @@
 
 "ui.settings.playback.title" = "播放与音频";
 "ui.settings.playback.section.playback" = "播放";
+"ui.settings.playback.section.quality" = "音质";
+"ui.settings.playback.apple_music_quality" = "Apple Music 式音质选项";
+"ui.settings.playback.quality.rule_footer" = "所选音质对每首歌都生效。歌曲没有这一档时，按 QQ 音乐的档位逐档降低，只影响这一首，下一首恢复所选音质。在播放页切换的音质只在本次启动内有效。";
+"ui.settings.playback.quality.apple_footer" = "只显示高质量、无损、高解析度无损三档，分别对应 QQ 音乐的 HQ 高品质（320 kbps）、SQ 无损（FLAC）和 Hi-Res（24 bit）。歌曲没有对应的一档时，仍按 QQ 音乐的档位逐档降低，下一首恢复所选音质。";
 "ui.settings.playback.wifi_quality" = "无线网络播放音质";
 "ui.settings.playback.cellular_quality" = "蜂窝网络播放音质";
 "ui.settings.playback.volume_control" = "音量控制";
-"ui.settings.playback.quality.footer" = "音质受歌曲版权和账号权限限制；Hi-Res、环绕声与超清母带仅在曲目支持时可用，不支持时会自动降级。播放页内临时切换的音质仅在本次启动内有效，重新打开 App 会恢复这里的默认设置。%@";
 "ui.settings.playback.section.audio_processing" = "音频处理";
 "ui.settings.playback.audio_processing.footer.downloads" = "均衡器和自动混音会同时作用于网络播放和已下载歌曲。";
 "ui.settings.playback.audio_processing.footer" = "均衡器和自动混音会同时作用于歌曲播放。";
@@ -910,8 +919,6 @@
 "ui.common.continue" = "继续";
 "ui.common.maybe_later" = "稍后再说";
 "ui.common.done" = "完成";
-"ui.error.playback.title" = "歌曲无法播放";
-"ui.error.playback.current_unavailable" = "当前歌曲暂时无法播放。";
 "ui.player.play_next" = "播放下一首";
 "ui.error.heart_mode_launch.title" = "无法自动启动心动模式";
 "ui.error.try_again_later" = "请稍后重试。";
@@ -1100,7 +1107,7 @@
 "ui.home.error.current_song_required" = "请先播放一首歌曲，再查找相似歌曲。";
 "ui.home.error.no_playable_recommendations" = "QQ 音乐暂时没有返回可播放的推荐歌曲。";
 "ui.home.section.recommended_playlists" = "推荐歌单";
-"ui.home.section.recently_trending" = "近期云村热播";
+"ui.home.section.recently_trending" = "近期热播";
 "ui.home.section.tailored" = "根据你的喜好为你推荐";
 "ui.home.section.charts" = "排行榜";
 "ui.home.section.your_playlists" = "你的歌单";
@@ -1383,6 +1390,9 @@
 "ui.player.loading_quality" = "正在获取可用音质";
 "ui.player.quality" = "音质";
 "ui.player.quality_unavailable" = "暂无%@音源";
+"ui.player.quality_downgraded" = "暂无%@，正在播放%@";
+"ui.player.quality_not_in_song" = "本曲暂无";
+"ui.player.quality_switch_failed" = "暂时无法切换音质";
 "ui.player.playback_quality" = "播放音质";
 "ui.player.quality_hint" = "轻点调整当前歌曲音质";
 "ui.player.volume" = "播放器音量";

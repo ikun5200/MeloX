@@ -95,15 +95,20 @@ final class AudioFileStreamProcessor {
     func processSeek() {
         guard let stream = audioFileStream,
               let entry = playerContext.audioReadingEntry else { return }
-        let target = max(entry.seekRequest.time, 0)
-        let priming = Double(entry.audioStreamState.packetTableInfo?.mPrimingFrames ?? 0)
-            / entry.audioStreamFormat.mSampleRate
+        // A stream whose format is not known yet has no sample rate; the
+        // divisions below would yield NaN, and converting that traps.
+        let requested = entry.seekRequest.time
+        let target = requested.isFinite ? max(requested, 0) : 0
+        let streamSampleRate = entry.audioStreamFormat.mSampleRate
+        let priming = streamSampleRate > 0
+            ? Double(entry.audioStreamState.packetTableInfo?.mPrimingFrames ?? 0) / streamSampleRate
+            : 0
         var byteOffset: Int64 = 0
         var decodedStart: Double = 0
 
         // Warm the decoder before the target packet (MP3 uses a bit reservoir).
         if target > 0, entry.packetDuration > 0 {
-            let packet = max(Int64(floor((target + priming) / entry.packetDuration)) - 10, 0)
+            let packet = max(Int64(Self.frames((target + priming) / entry.packetDuration)) - 10, 0)
             var flags = AudioFileStreamSeekFlags()
             var offset: Int64 = 0
             if AudioFileStreamSeek(stream, packet, &offset, &flags) == noErr,
@@ -122,9 +127,9 @@ final class AudioFileStreamProcessor {
         }
         if let converter = audioConverter { AudioConverterReset(converter) }
         discontinuous = byteOffset > 0
-        let targetFrame = Int((target * outputAudioFormat.mSampleRate).rounded())
-            + Int((priming * outputAudioFormat.mSampleRate).rounded())
-        let startFrame = Int((decodedStart * outputAudioFormat.mSampleRate).rounded())
+        let targetFrame = Self.frames((target * outputAudioFormat.mSampleRate).rounded())
+            + Self.frames((priming * outputAudioFormat.mSampleRate).rounded())
+        let startFrame = Self.frames((decodedStart * outputAudioFormat.mSampleRate).rounded())
         seekFramesToDiscard = max(targetFrame - startFrame, 0)
         prepareSeekDiscardBuffer()
         entry.lock.withLock { entry.seekTime = target }
@@ -133,6 +138,13 @@ final class AudioFileStreamProcessor {
         rendererContext.waitingForDataAfterSeekFrameCount.write { $0 = 0 }
         playerContext.setInternalState(to: .waitingForDataAfterSeek)
         entry.seek(at: Int(byteOffset))
+    }
+
+    /// A frame count from a computed value, without the trap `Int(_:)` has
+    /// for NaN, infinity and out-of-range values.
+    private static func frames(_ value: Double) -> Int {
+        guard value.isFinite else { return 0 }
+        return Int(min(max(value.rounded(.down), 0), 4_000_000_000_000))
     }
 
     /// Creates an `AudioConverter` instance to be used for converting the remote audio data to the canonical audio format
@@ -260,7 +272,7 @@ final class AudioFileStreamProcessor {
         let beginsAtStart = entry.seekTime == 0 && entry.framesState.queued == 0
         entry.lock.unlock()
         if beginsAtStart, entry.audioStreamFormat.mSampleRate > 0 {
-            seekFramesToDiscard = Int((Double(table.mPrimingFrames)
+            seekFramesToDiscard = Self.frames((Double(table.mPrimingFrames)
                 * outputAudioFormat.mSampleRate / entry.audioStreamFormat.mSampleRate).rounded())
             prepareSeekDiscardBuffer()
         }
@@ -613,10 +625,11 @@ final class AudioFileStreamProcessor {
         guard let entry = playerContext.audioReadingEntry else { return }
         entry.lock.lock()
         var validFrames = framesCount
-        if let table = entry.audioStreamState.packetTableInfo, table.mNumberValidFrames > 0 {
+        if let table = entry.audioStreamState.packetTableInfo, table.mNumberValidFrames > 0,
+           entry.audioStreamFormat.mSampleRate > 0 {
             let duration = Double(table.mNumberValidFrames) / entry.audioStreamFormat.mSampleRate
-            let remaining = max(Int(((duration - entry.seekTime) * outputAudioFormat.mSampleRate).rounded()) - entry.framesState.queued, 0)
-            validFrames = min(validFrames, UInt32(remaining))
+            let remaining = max(Self.frames(((duration - entry.seekTime) * outputAudioFormat.mSampleRate).rounded()) - entry.framesState.queued, 0)
+            validFrames = min(validFrames, UInt32(min(remaining, Int(UInt32.max))))
         }
         entry.framesState.queued += Int(validFrames)
         entry.lock.unlock()

@@ -229,6 +229,12 @@ public class RemoteAudioSource: AudioStreamSource {
                 self?.parseResponseHeader(response: urlResponse)
                 task.cancel()
                 completion()
+            case let .stream(.failure(error)):
+                // The connection failed before any response. Nothing else
+                // reports it, and the player would wait for data forever.
+                task.cancel()
+                guard let self else { return }
+                self.delegate?.errorOccurred(source: self, error: error)
             default:
                 break
             }
