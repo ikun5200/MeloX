@@ -74,6 +74,14 @@ struct MeloXApp: App {
             settings: settings,
             lyricsStore: lyrics
         )
+        #if DEBUG && targetEnvironment(simulator)
+        MeloXDebugAutomation.start(
+            player: player,
+            api: api,
+            settings: settings,
+            downloads: downloads
+        )
+        #endif
         _settings = State(initialValue: settings)
         _api = State(initialValue: api)
         _sourceStore = State(initialValue: sourceStore)
