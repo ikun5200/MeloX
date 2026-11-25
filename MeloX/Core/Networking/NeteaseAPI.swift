@@ -558,12 +558,15 @@ final class NeteaseAPI {
 
     func playbackSource(
         for song: Song,
+        quality: MusicQuality? = nil,
+        availability: SongAudioAvailability? = nil,
         refreshingSource: Bool = false
     ) async throws -> PlaybackSource {
         if let resolver {
             return try await resolver.resolve(
                 song: song,
-                quality: playbackQuality,
+                quality: quality ?? playbackQuality,
+                availability: availability ?? song.audioAvailability,
                 bypassingCache: refreshingSource
             )
         }
@@ -650,7 +653,8 @@ final class NeteaseAPI {
         if let resolver {
             return try await resolver.resolve(
                 song: song,
-                quality: quality
+                quality: quality,
+                availability: song.audioAvailability
             )
         }
         do {

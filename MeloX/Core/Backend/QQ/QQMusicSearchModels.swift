@@ -28,6 +28,7 @@ nonisolated struct QQSearchSong: Sendable {
     let durationSeconds: Int
     let musicVideoID: Int?
     let musicVideoMID: String?
+    var audioAvailability: SongAudioAvailability = .unknown
 }
 
 nonisolated struct QQSearchAlbum: Sendable {
@@ -149,7 +150,39 @@ nonisolated enum QQMusicSearchParser {
             coverURL: coverURL,
             durationSeconds: int(item, "interval", "duration") ?? 0,
             musicVideoID: musicVideoID,
-            musicVideoMID: musicVideoMID
+            musicVideoMID: musicVideoMID,
+            audioAvailability: audioAvailability(from: fileDictionary)
+        )
+    }
+
+    /// `file` 给出这首歌每种编码的字节数，0 表示没有这一档。
+    /// `size_new` 的下标含义：0 臻品母带、1 臻品音质 2.0、2 臻品全景声 5.1。
+    static func audioAvailability(
+        from file: [String: Any]?
+    ) -> SongAudioAvailability {
+        guard let file,
+              file["size_128mp3"] != nil || file["size_flac"] != nil else {
+            return .unknown
+        }
+        let extended = (file["size_new"] as? [Any] ?? []).map {
+            ($0 as? NSNumber)?.int64Value ?? 0
+        }
+        func size(_ key: String) -> Int64 {
+            (file[key] as? NSNumber)?.int64Value ?? 0
+        }
+        func extendedSize(_ index: Int) -> Int64 {
+            extended.indices.contains(index) ? extended[index] : 0
+        }
+        return SongAudioAvailability(
+            encodingSizes: [
+                .standard: size("size_128mp3"),
+                .high: size("size_320mp3"),
+                .lossless: size("size_flac"),
+                .hiResolution: size("size_hires"),
+                .highDefinitionSurround: extendedSize(1),
+                .immersiveSurround: extendedSize(2),
+                .ultraClearMaster: extendedSize(0),
+            ]
         )
     }
 

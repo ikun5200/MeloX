@@ -61,6 +61,7 @@ final class LXPlaybackResolver {
     func resolve(
         song: Song,
         quality: MusicQuality,
+        availability: SongAudioAvailability = .unknown,
         bypassingCache: Bool = false
     ) async throws -> PlaybackSource {
         let songMID = song.mid.trimmingCharacters(
@@ -103,6 +104,17 @@ final class LXPlaybackResolver {
             where !tiers.contains(candidate) {
                 tiers.append(candidate)
             }
+        }
+        // QQ reports which encodings a song has; asking a source for one
+        // that does not exist only costs a failed request per source.
+        let existingTiers = tiers.filter { tier in
+            guard let tierQuality = LXQualityMapping.quality(for: tier) else {
+                return true
+            }
+            return availability.supports(tierQuality) != false
+        }
+        if !existingTiers.isEmpty {
+            tiers = existingTiers
         }
 
         var unavailableSourceIDs: Set<UUID> = []

@@ -33,6 +33,7 @@ nonisolated enum QQMusicMapper {
             ),
             durationMS: max(value.durationSeconds, 0) * 1_000,
             musicVideoID: value.musicVideoID,
+            audioAvailability: value.audioAvailability,
             mid: value.mid,
             mediaMID: value.mediaMID,
             musicVideoMID: value.musicVideoMID

@@ -62,6 +62,12 @@ final class PlayerStore {
     private(set) var beatAnalysisStatus:
         PlaybackBeatAnalysisStatus = .idle
     private(set) var effectivePlaybackQuality: MusicQuality?
+    /// True while a quality picked in the player is being fetched. The
+    /// current stream keeps playing until the new one is ready.
+    private(set) var isSwitchingPlaybackQuality = false
+    /// A short message shown in place of the quality label, for a pick that
+    /// could not be honoured.
+    private(set) var playbackQualityNotice: String?
     private(set) var sleepTimer: PlaybackSleepTimer
 
     var currentAudioSpectrum: PlaybackAudioSpectrumSnapshot {
@@ -72,14 +78,14 @@ final class PlayerStore {
         guard currentSong != nil else { return [] }
         let sourceQualities = api.sourcePlaybackQualities
         if !sourceQualities.isEmpty {
-            // A downloaded file can be a tier no source declares.
-            guard let effectivePlaybackQuality,
-                  !sourceQualities.contains(effectivePlaybackQuality) else {
-                return sourceQualities
-            }
-            return MusicQuality.allCases.filter {
-                sourceQualities.contains($0)
-                    || $0 == effectivePlaybackQuality
+            // Offer what a source can fetch and this song actually has.
+            // The playing tier stays listed: a downloaded file can be one
+            // that no source declares.
+            return MusicQuality.allCases.filter { quality in
+                if quality == effectivePlaybackQuality { return true }
+                return sourceQualities.contains(quality)
+                    && currentSongAudioAvailability.supports(quality)
+                        != false
             }
         }
         guard !isResolvingCurrentSongAudioAvailability else { return [] }
@@ -252,7 +258,17 @@ final class PlayerStore {
     private var seekLoadingIndicatorTask: Task<Void, Never>?
 
     @ObservationIgnored
-    private var refreshesPlaybackSourceOnNextLoad = false
+    private var qualitySwitchTask: Task<Void, Never>?
+
+    @ObservationIgnored
+    private var qualityNoticeTask: Task<Void, Never>?
+
+    /// A stream fetched ahead of the reload that will play it.
+    @ObservationIgnored
+    private var preresolvedPlaybackSource: (songID: Int, source: PlaybackSource)?
+
+    @ObservationIgnored
+    private var resolvedAudioAvailability: [Int: SongAudioAvailability] = [:]
 
     @ObservationIgnored
     private var nowPlayingLyricsSongID: Int?
@@ -714,31 +730,99 @@ final class PlayerStore {
                     && effectivePlaybackQuality != quality) else {
             return
         }
-        refreshesPlaybackSourceOnNextLoad = isRetry
-        let shouldAutoplay = isPlaying
-            || (isLoading && currentLoadShouldAutoplay)
-        let resumePosition = engine.currentPlaybackTime
-            ?? estimatedProgress()
-        let songID = currentSong?.id
         api.setSessionPlaybackQuality(
             quality,
             forCellularData: targetsCellularData
         )
-        guard let songID else { return }
-        seekRevision += 1
-        let qualityChangeRevision = seekRevision
-        Task { @MainActor [weak self] in
-            guard let self,
-                  self.currentSong?.id == songID else { return }
-            let startPosition =
-                self.seekRevision == qualityChangeRevision
-                ? resumePosition
-                : self.estimatedProgress()
-            await self.loadCurrentSong(
+        guard let song = currentSong else { return }
+
+        guard api.isUsingSourceResolver, !song.mid.isEmpty else {
+            let shouldAutoplay = isPlaying
+                || (isLoading && currentLoadShouldAutoplay)
+            let resumePosition = engine.currentPlaybackTime
+                ?? estimatedProgress()
+            seekRevision += 1
+            let qualityChangeRevision = seekRevision
+            Task { @MainActor [weak self] in
+                guard let self,
+                      self.currentSong?.id == song.id else { return }
+                let startPosition =
+                    self.seekRevision == qualityChangeRevision
+                    ? resumePosition
+                    : self.estimatedProgress()
+                await self.loadCurrentSong(
+                    autoplay: shouldAutoplay,
+                    startAt: startPosition
+                )
+            }
+            return
+        }
+
+        // Fetch the new stream first and swap only once it exists. Tearing
+        // playback down before knowing whether the sources can serve the
+        // tier left the song silent, and a failure skipped to the next one.
+        qualitySwitchTask?.cancel()
+        playbackQualityNotice = nil
+        isSwitchingPlaybackQuality = true
+        qualitySwitchTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let source = try? await api.playbackSource(
+                for: song,
+                quality: quality,
+                availability: knownAudioAvailability(for: song),
+                refreshingSource: isRetry
+            )
+            guard !Task.isCancelled else { return }
+            qualitySwitchTask = nil
+            isSwitchingPlaybackQuality = false
+            guard currentSong?.id == song.id else { return }
+            guard let source,
+                  source.quality != effectivePlaybackQuality else {
+                showPlaybackQualityNotice(
+                    L10n.format(
+                        "ui.player.quality_unavailable",
+                        quality.title
+                    )
+                )
+                return
+            }
+
+            preresolvedPlaybackSource = (song.id, source)
+            let shouldAutoplay = isPlaying
+                || (isLoading && currentLoadShouldAutoplay)
+            let resumePosition = engine.currentPlaybackTime
+                ?? estimatedProgress()
+            seekRevision += 1
+            await loadCurrentSong(
                 autoplay: shouldAutoplay,
-                startAt: startPosition
+                startAt: resumePosition
             )
         }
+    }
+
+    private func showPlaybackQualityNotice(_ message: String) {
+        playbackQualityNotice = message
+        qualityNoticeTask?.cancel()
+        qualityNoticeTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(2.5))
+            guard !Task.isCancelled else { return }
+            self?.playbackQualityNotice = nil
+        }
+    }
+
+    private func cancelPlaybackQualitySwitch() {
+        qualitySwitchTask?.cancel()
+        qualitySwitchTask = nil
+        isSwitchingPlaybackQuality = false
+    }
+
+    private func knownAudioAvailability(
+        for song: Song
+    ) -> SongAudioAvailability {
+        if song.audioAvailability.isKnown {
+            return song.audioAvailability
+        }
+        return resolvedAudioAvailability[song.id] ?? .unknown
     }
 
     func next() async {
@@ -1221,6 +1305,7 @@ final class PlayerStore {
         let formerSongID = currentSong?.id
         if song.id != formerSongID {
             playbackRecoveryAttempts = 0
+            cancelPlaybackQualitySwitch()
         }
         cancelAutoMixPreparation()
         loadGeneration += 1
@@ -1336,6 +1421,12 @@ final class PlayerStore {
                 throw CancellationError()
             }
             do {
+                let preresolved = preresolvedPlaybackSource
+                preresolvedPlaybackSource = nil
+                if let preresolved, preresolved.songID == song.id {
+                    isUsingDownloadedSource = false
+                    return preresolved.source
+                }
                 let downloadedSource = downloads.localPlaybackSource(
                     songID: song.id
                 )
@@ -1350,17 +1441,14 @@ final class PlayerStore {
                     return try await api.playbackSource(for: cachedDetailedSong)
                 }
                 if !song.mid.isEmpty {
-                    let refreshesSource = refreshesPlaybackSourceOnNextLoad
-                    refreshesPlaybackSourceOnNextLoad = false
                     guard let downloadedSource else {
                         return try await api.playbackSource(
                             for: song,
-                            refreshingSource: refreshesSource
+                            availability: knownAudioAvailability(for: song)
                         )
                     }
                     return await streamedSource(
                         for: song,
-                        refreshingSource: refreshesSource,
                         fallingBackTo: downloadedSource
                     )
                 }
@@ -1392,12 +1480,11 @@ final class PlayerStore {
 
     private func streamedSource(
         for song: Song,
-        refreshingSource: Bool,
         fallingBackTo downloadedSource: PlaybackSource
     ) async -> PlaybackSource {
         let streamed = try? await api.playbackSource(
             for: song,
-            refreshingSource: refreshingSource
+            availability: knownAudioAvailability(for: song)
         )
         // No stream, or one that had to downgrade to no better than the
         // saved file, is no reason to leave the file.
@@ -2173,9 +2260,27 @@ final class PlayerStore {
     ) {
         audioAvailabilityTask?.cancel()
         if api.isUsingSourceResolver {
-            currentSongAudioAvailability = .unknown
+            let known = knownAudioAvailability(for: song)
+            currentSongAudioAvailability = known
             isResolvingCurrentSongAudioAvailability = false
             audioAvailabilityTask = nil
+            guard !known.isKnown, !song.mid.isEmpty else { return }
+            // Lists that omit the file sizes leave the tiers unknown; the
+            // song detail has them.
+            audioAvailabilityTask = Task { @MainActor [weak self] in
+                guard let api = self?.api else { return }
+                let detailedSong = try? await api.songDetail(mid: song.mid)
+                guard let self,
+                      !Task.isCancelled,
+                      let availability = detailedSong?.audioAvailability,
+                      availability.isKnown else {
+                    return
+                }
+                resolvedAudioAvailability[song.id] = availability
+                if currentSong?.id == song.id {
+                    currentSongAudioAvailability = availability
+                }
+            }
             return
         }
         if let detailedSong = detailedPlaybackSongs[song.id] {

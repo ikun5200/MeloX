@@ -148,9 +148,15 @@ private struct NowPlayingQualityMenu: View {
             }
         } label: {
             HStack(spacing: 5) {
-                Image(systemName: "waveform")
-                    .font(.system(size: 9, weight: .semibold))
-                Text(displayedQualityTitle)
+                if player.isSwitchingPlaybackQuality {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .tint(.white)
+                } else {
+                    Image(systemName: "waveform")
+                        .font(.system(size: 9, weight: .semibold))
+                }
+                Text(player.playbackQualityNotice ?? displayedQualityTitle)
             }
             .padding(.horizontal, 9)
             .padding(.vertical, 4)

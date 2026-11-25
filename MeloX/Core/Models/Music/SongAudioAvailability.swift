@@ -53,6 +53,34 @@ nonisolated struct SongAudioAvailability: Codable, Hashable, Sendable {
         isKnown = false
     }
 
+    /// Builds a known availability from the byte size of each encoding.
+    /// A missing or zero size means the song has no file at that quality.
+    init(encodingSizes sizes: [MusicQuality: Int64]) {
+        func resource(_ quality: MusicQuality) -> SongAudioResource? {
+            guard let size = sizes[quality], size > 0 else { return nil }
+            return SongAudioResource(
+                bitrate: nil,
+                fileID: nil,
+                size: size,
+                volumeDelta: nil,
+                sampleRate: nil
+            )
+        }
+        standard = resource(.standard)
+        medium = nil
+        high = resource(.high)
+        lossless = resource(.lossless)
+        hiResolution = resource(.hiResolution)
+        highDefinitionSurround = resource(.highDefinitionSurround)
+        immersiveSurround = resource(.immersiveSurround)
+        ultraClearMaster = resource(.ultraClearMaster)
+        isKnown = true
+    }
+
+    func supports(_ quality: MusicQuality) -> Bool? {
+        supports(apiLevel: quality.apiLevel)
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         standard = try container.decodeIfPresent(

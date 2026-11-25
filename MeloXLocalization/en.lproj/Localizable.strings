@@ -1382,6 +1382,7 @@
 "ui.player.transitioning_to" = "Transitioning to %@, %ld%%";
 "ui.player.loading_quality" = "Loading Available Quality";
 "ui.player.quality" = "Quality";
+"ui.player.quality_unavailable" = "%@ unavailable";
 "ui.player.playback_quality" = "Playback Quality";
 "ui.player.quality_hint" = "Tap to adjust quality for the current song";
 "ui.player.volume" = "Player Volume";

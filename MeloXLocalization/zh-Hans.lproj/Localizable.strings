@@ -1382,6 +1382,7 @@
 "ui.player.transitioning_to" = "正在过渡到%@，%ld%%";
 "ui.player.loading_quality" = "正在获取可用音质";
 "ui.player.quality" = "音质";
+"ui.player.quality_unavailable" = "暂无%@音源";
 "ui.player.playback_quality" = "播放音质";
 "ui.player.quality_hint" = "轻点调整当前歌曲音质";
 "ui.player.volume" = "播放器音量";
