@@ -5,6 +5,9 @@ struct AboutView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(AppReleaseNotesStore.self) private var releaseNotes
 
+    @AppStorage(FloatingLyricsController.diagnosticsDisabledKey)
+    private var disablesFloatingLyricsComponent = false
+
     @State private var isCheckingUpdate = false
     @State private var updateAlert: AppUpdateAlert?
 
@@ -35,6 +38,11 @@ struct AboutView: View {
                 LabeledContent("ui.about.version", value: releaseVersion)
                 LabeledContent("ui.about.build", value: buildNumber)
                 LabeledContent("ui.about.bundle_id", value: bundleIdentifier)
+                LabeledContent(
+                    "ui.about.signing_id",
+                    value: signingIdentifier
+                        ?? L10n.string("ui.about.signing_id.unreadable")
+                )
                 LabeledContent(
                     "ui.about.install_check",
                     value: installCheckSummary
@@ -86,6 +94,17 @@ struct AboutView: View {
                 Text("ui.about.updates.section")
             } footer: {
                 Text("ui.about.updates.footer")
+            }
+
+            Section {
+                Toggle(
+                    "ui.about.diagnostics.disable_floating_lyrics",
+                    isOn: $disablesFloatingLyricsComponent
+                )
+            } header: {
+                Text("ui.about.diagnostics.section")
+            } footer: {
+                Text("ui.about.diagnostics.disable_floating_lyrics.footer")
             }
 
             Section("ui.about.melox.section") {
@@ -182,7 +201,14 @@ struct AboutView: View {
     /// The system routes Now Playing taps and hides its island by the
     /// installed app's identity. A re-signed or container-hosted copy can
     /// report an identifier that differs from the one actually installed.
+    private var signingIdentifier: String? {
+        CodeSigningIdentity.signingIdentifier
+    }
+
     private var installCheckSummary: String {
+        if let signingIdentifier, signingIdentifier != bundleIdentifier {
+            return L10n.string("ui.about.install_check.signing_id_mismatch")
+        }
         let installedIdentifier = NSDictionary(
             contentsOf: Bundle.main.bundleURL
                 .appendingPathComponent("Info.plist")

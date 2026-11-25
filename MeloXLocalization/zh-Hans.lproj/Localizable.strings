@@ -504,6 +504,12 @@
 "ui.about.version" = "版本";
 "ui.about.build" = "构建版本";
 "ui.about.bundle_id" = "包标识";
+"ui.about.signing_id" = "签名标识";
+"ui.about.signing_id.unreadable" = "无法读取";
+"ui.about.install_check.signing_id_mismatch" = "签名标识与包标识不一致";
+"ui.about.diagnostics.section" = "诊断";
+"ui.about.diagnostics.disable_floating_lyrics" = "停用悬浮歌词组件";
+"ui.about.diagnostics.disable_floating_lyrics.footer" = "仅用于排查系统播放卡片点击后不回到 App 的问题。开启后悬浮歌词不可用，需要完全退出并重新打开 App 才生效。";
 "ui.about.install_check" = "安装检查";
 "ui.about.install_check.normal" = "正常";
 "ui.about.install_check.bundle_id_mismatch" = "包标识不一致（%@）";

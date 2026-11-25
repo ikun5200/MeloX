@@ -52,6 +52,11 @@ final class FloatingLyricsController: NSObject {
     @ObservationIgnored
     private var pictureInPictureStartTask: Task<Void, Never>?
 
+    /// Set from About to rule this component out while diagnosing how the
+    /// system attributes the Now Playing session. Read once at launch.
+    nonisolated static let diagnosticsDisabledKey =
+        "diagnostics.disablesFloatingLyricsComponent"
+
     init(
         player: PlayerStore,
         settings: AppSettings,
@@ -72,7 +77,12 @@ final class FloatingLyricsController: NSObject {
         displayLayer.backgroundColor = UIColor.black.cgColor
         configurePlaybackTimebase()
 
-        guard isSupported else { return }
+        guard isSupported,
+              !UserDefaults.standard.bool(
+                forKey: Self.diagnosticsDisabledKey
+              ) else {
+            return
+        }
 
         let contentSource = AVPictureInPictureController.ContentSource(
             sampleBufferDisplayLayer: displayLayer,
@@ -87,6 +97,7 @@ final class FloatingLyricsController: NSObject {
     }
 
     func monitor() async {
+        guard pictureInPictureController != nil else { return }
         refreshArtworkIfNeeded()
         synchronizePlaybackState(force: true)
         refreshFrame(force: true)
@@ -146,6 +157,7 @@ final class FloatingLyricsController: NSObject {
     }
 
     func attachDisplayLayer(to hostLayer: CALayer, bounds: CGRect) {
+        guard pictureInPictureController != nil else { return }
         if displayLayer.superlayer !== hostLayer {
             displayLayer.removeFromSuperlayer()
             hostLayer.addSublayer(displayLayer)

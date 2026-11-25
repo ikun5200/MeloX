@@ -82,6 +82,12 @@ final class NeteaseAPI {
         return sessionPlaybackQuality ?? settings.quality
     }
 
+    var hasSessionPlaybackQuality: Bool {
+        isCellularData
+            ? sessionCellularPlaybackQuality != nil
+            : sessionPlaybackQuality != nil
+    }
+
     func setSessionPlaybackQuality(
         _ quality: MusicQuality,
         forCellularData isCellular: Bool
@@ -550,11 +556,15 @@ final class NeteaseAPI {
         )
     }
 
-    func playbackSource(for song: Song) async throws -> PlaybackSource {
+    func playbackSource(
+        for song: Song,
+        refreshingSource: Bool = false
+    ) async throws -> PlaybackSource {
         if let resolver {
             return try await resolver.resolve(
                 song: song,
-                quality: playbackQuality
+                quality: playbackQuality,
+                bypassingCache: refreshingSource
             )
         }
         return try await playbackSource(

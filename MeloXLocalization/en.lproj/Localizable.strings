@@ -504,6 +504,12 @@
 "ui.about.version" = "Version";
 "ui.about.build" = "Build";
 "ui.about.bundle_id" = "Bundle ID";
+"ui.about.signing_id" = "Signing ID";
+"ui.about.signing_id.unreadable" = "Unreadable";
+"ui.about.install_check.signing_id_mismatch" = "Signing ID differs from Bundle ID";
+"ui.about.diagnostics.section" = "Diagnostics";
+"ui.about.diagnostics.disable_floating_lyrics" = "Disable Floating Lyrics Component";
+"ui.about.diagnostics.disable_floating_lyrics.footer" = "Only for diagnosing the system Now Playing card not returning to the app. Floating lyrics are unavailable while this is on. Quit and reopen the app for it to take effect.";
 "ui.about.install_check" = "Install Check";
 "ui.about.install_check.normal" = "Normal";
 "ui.about.install_check.bundle_id_mismatch" = "Bundle ID mismatch (%@)";

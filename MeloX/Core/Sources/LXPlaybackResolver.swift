@@ -60,7 +60,8 @@ final class LXPlaybackResolver {
 
     func resolve(
         song: Song,
-        quality: MusicQuality
+        quality: MusicQuality,
+        bypassingCache: Bool = false
     ) async throws -> PlaybackSource {
         let songMID = song.mid.trimmingCharacters(
             in: .whitespacesAndNewlines
@@ -70,7 +71,8 @@ final class LXPlaybackResolver {
         }
 
         let cacheKey = "\(songMID)#\(quality.rawValue)"
-        if let cached = cache[cacheKey],
+        if !bypassingCache,
+           let cached = cache[cacheKey],
            Date().timeIntervalSince(cached.date) < cacheLifetime {
             return cached.source
         }
@@ -83,62 +85,121 @@ final class LXPlaybackResolver {
         let musicInfo = musicInfo(for: song)
         var lastError: Error?
 
-        for source in sources {
-            do {
-                let runtime = try await runtime(for: source)
-                let qualities = LXQualityMapping.candidates(
+        // A tier is offered to every source before stepping down, so a
+        // lower-priority source that has the requested quality wins over a
+        // downgrade at the first one.
+        let candidatesBySource = sources.map { source in
+            (
+                source: source,
+                candidates: LXQualityMapping.candidates(
                     for: quality,
                     supported: source.qqQualities
                 )
-
-                for candidate in qualities {
-                    do {
-                        let rawURL = try await runtime.resolveMusicURL(
-                            musicInfo: musicInfo,
-                            quality: candidate
-                        )
-                        guard let url = secureURL(rawURL) else {
-                            throw LXPlaybackError.invalidURL
-                        }
-                        let playbackSource = PlaybackSource(
-                            url: url,
-                            bitrate: LXQualityMapping.bitrate(
-                                for: candidate
-                            ),
-                            format: LXQualityMapping.format(
-                                for: url,
-                                quality: candidate
-                            ),
-                            quality: LXQualityMapping.quality(
-                                for: candidate
-                            ) ?? quality,
-                            headers: [:],
-                            sourceName: source.name,
-                            qualityVerified: false
-                        )
-                        cache[cacheKey] = CachedSource(
-                            source: playbackSource,
-                            date: Date()
-                        )
-                        return playbackSource
-                    } catch is CancellationError {
-                        throw CancellationError()
-                    } catch {
-                        lastError = error
-                    }
-                }
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch {
-                lastError = error
-                runtimes[source.id] = nil
-                store.updateAfterRuntimeFailure(source, error: error)
+            )
+        }
+        var tiers = LXQualityMapping.preference(for: quality)
+        for entry in candidatesBySource {
+            for candidate in entry.candidates
+            where !tiers.contains(candidate) {
+                tiers.append(candidate)
             }
         }
 
+        var unavailableSourceIDs: Set<UUID> = []
+        // The best stream that turned out to be a lower quality than the
+        // tier it was requested as.
+        var downgraded: PlaybackSource?
+
+        for (tierIndex, tier) in tiers.enumerated() {
+            let tierQuality = LXQualityMapping.quality(for: tier)
+
+            for entry in candidatesBySource
+            where entry.candidates.contains(tier)
+                && !unavailableSourceIDs.contains(entry.source.id) {
+                let source = entry.source
+                let scriptRuntime: LXScriptRuntime
+                do {
+                    scriptRuntime = try await runtime(for: source)
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    lastError = error
+                    unavailableSourceIDs.insert(source.id)
+                    runtimes[source.id] = nil
+                    store.updateAfterRuntimeFailure(source, error: error)
+                    continue
+                }
+
+                do {
+                    let rawURL = try await scriptRuntime.resolveMusicURL(
+                        musicInfo: musicInfo,
+                        quality: tier
+                    )
+                    guard let url = secureURL(rawURL) else {
+                        throw LXPlaybackError.invalidURL
+                    }
+                    let verifiedQuality = LXQualityMapping
+                        .verifiedQuality(for: url)
+                    let playbackSource = PlaybackSource(
+                        url: url,
+                        bitrate: verifiedQuality.map {
+                            LXQualityMapping.bitrate(for: $0)
+                        } ?? LXQualityMapping.bitrate(for: tier),
+                        format: LXQualityMapping.format(
+                            for: url,
+                            quality: tier
+                        ),
+                        quality: verifiedQuality
+                            ?? tierQuality
+                            ?? quality,
+                        headers: [:],
+                        sourceName: source.name,
+                        qualityVerified: verifiedQuality != nil
+                    )
+                    if let verifiedQuality,
+                       LXQualityMapping.rank(of: verifiedQuality)
+                        < LXQualityMapping.rank(of: tierQuality) {
+                        if LXQualityMapping.rank(of: verifiedQuality)
+                            > LXQualityMapping.rank(of: downgraded?.quality) {
+                            downgraded = playbackSource
+                        }
+                        continue
+                    }
+                    return remember(playbackSource, for: cacheKey)
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    lastError = error
+                }
+            }
+
+            if let downgraded {
+                let nextTier = tiers.indices.contains(tierIndex + 1)
+                    ? tiers[tierIndex + 1]
+                    : nil
+                let nextRank = LXQualityMapping.rank(
+                    of: nextTier.flatMap(LXQualityMapping.quality(for:))
+                )
+                if LXQualityMapping.rank(of: downgraded.quality) >= nextRank {
+                    return remember(downgraded, for: cacheKey)
+                }
+            }
+        }
+
+        if let downgraded {
+            return remember(downgraded, for: cacheKey)
+        }
         throw LXPlaybackError.noSourceResolved(
             lastError?.localizedDescription
         )
+    }
+
+    private func remember(
+        _ source: PlaybackSource,
+        for cacheKey: String
+    ) -> PlaybackSource {
+        cache[cacheKey] = CachedSource(source: source, date: Date())
+        return source
     }
 
     func invalidate(sourceID: UUID? = nil) {

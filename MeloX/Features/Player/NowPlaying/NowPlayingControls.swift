@@ -172,7 +172,9 @@ private struct NowPlayingQualityMenu: View {
 
     private var qualityBinding: Binding<MusicQuality> {
         Binding(
-            get: { api.playbackQuality },
+            // Mark what is actually playing; the requested tier only
+            // stands in while the stream is still being resolved.
+            get: { player.effectivePlaybackQuality ?? api.playbackQuality },
             set: { player.selectSessionPlaybackQuality($0) }
         )
     }

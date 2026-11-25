@@ -10,7 +10,11 @@ struct PlaybackSettingsView: View {
         Form {
             Section {
                 Picker("ui.settings.playback.wifi_quality", selection: qualityBinding(forCellularData: false)) {
-                    ForEach(MusicQuality.allCases) { quality in
+                    ForEach(
+                        player.selectablePlaybackQualities(
+                            including: settings.quality
+                        )
+                    ) { quality in
                         Text(quality.title).tag(quality)
                     }
                 }
@@ -19,7 +23,11 @@ struct PlaybackSettingsView: View {
                     "ui.settings.playback.cellular_quality",
                     selection: qualityBinding(forCellularData: true)
                 ) {
-                    ForEach(MusicQuality.allCases) { quality in
+                    ForEach(
+                        player.selectablePlaybackQualities(
+                            including: settings.cellularQuality
+                        )
+                    ) { quality in
                         Text(quality.title).tag(quality)
                     }
                 }

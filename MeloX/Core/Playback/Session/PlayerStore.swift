@@ -72,7 +72,15 @@ final class PlayerStore {
         guard currentSong != nil else { return [] }
         let sourceQualities = api.sourcePlaybackQualities
         if !sourceQualities.isEmpty {
-            return sourceQualities
+            // A downloaded file can be a tier no source declares.
+            guard let effectivePlaybackQuality,
+                  !sourceQualities.contains(effectivePlaybackQuality) else {
+                return sourceQualities
+            }
+            return MusicQuality.allCases.filter {
+                sourceQualities.contains($0)
+                    || $0 == effectivePlaybackQuality
+            }
         }
         guard !isResolvingCurrentSongAudioAvailability else { return [] }
         if currentSongAudioAvailability.isKnown {
@@ -242,6 +250,9 @@ final class PlayerStore {
 
     @ObservationIgnored
     private var seekLoadingIndicatorTask: Task<Void, Never>?
+
+    @ObservationIgnored
+    private var refreshesPlaybackSourceOnNextLoad = false
 
     @ObservationIgnored
     private var nowPlayingLyricsSongID: Int?
@@ -644,6 +655,18 @@ final class PlayerStore {
         playbackIssue = nil
     }
 
+    /// The tiers worth offering in a quality picker: what the enabled
+    /// sources declare, plus the current choice so it stays visible.
+    func selectablePlaybackQualities(
+        including selected: MusicQuality
+    ) -> [MusicQuality] {
+        let sourceQualities = api.sourcePlaybackQualities
+        guard !sourceQualities.isEmpty else { return MusicQuality.allCases }
+        return MusicQuality.allCases.filter {
+            sourceQualities.contains($0) || $0 == selected
+        }
+    }
+
     func selectPlaybackQuality(_ quality: MusicQuality, forCellularData: Bool? = nil) {
         let targetsCellularData = forCellularData ?? api.isCellularData
         api.clearSessionPlaybackQuality()
@@ -683,7 +706,15 @@ final class PlayerStore {
     /// fresh launch returns to the Wi-Fi/cellular quality configured there.
     func selectSessionPlaybackQuality(_ quality: MusicQuality) {
         let targetsCellularData = api.isCellularData
-        guard api.playbackQuality != quality else { return }
+        // Picking the requested tier again after a downgrade asks the
+        // sources once more instead of replaying the cached answer.
+        let isRetry = api.playbackQuality == quality
+        guard !isRetry
+                || (effectivePlaybackQuality != nil
+                    && effectivePlaybackQuality != quality) else {
+            return
+        }
+        refreshesPlaybackSourceOnNextLoad = isRetry
         let shouldAutoplay = isPlaying
             || (isLoading && currentLoadShouldAutoplay)
         let resumePosition = engine.currentPlaybackTime
@@ -1305,7 +1336,11 @@ final class PlayerStore {
                 throw CancellationError()
             }
             do {
-                if let downloadedSource = downloads.localPlaybackSource(songID: song.id) {
+                let downloadedSource = downloads.localPlaybackSource(
+                    songID: song.id
+                )
+                if let downloadedSource,
+                   !prefersStreaming(over: downloadedSource, for: song) {
                     isUsingDownloadedSource = true
                     return downloadedSource
                 }
@@ -1315,7 +1350,19 @@ final class PlayerStore {
                     return try await api.playbackSource(for: cachedDetailedSong)
                 }
                 if !song.mid.isEmpty {
-                    return try await api.playbackSource(for: song)
+                    let refreshesSource = refreshesPlaybackSourceOnNextLoad
+                    refreshesPlaybackSourceOnNextLoad = false
+                    guard let downloadedSource else {
+                        return try await api.playbackSource(
+                            for: song,
+                            refreshingSource: refreshesSource
+                        )
+                    }
+                    return await streamedSource(
+                        for: song,
+                        refreshingSource: refreshesSource,
+                        fallingBackTo: downloadedSource
+                    )
                 }
                 return try await api.playbackSource(id: song.id)
             } catch is CancellationError {
@@ -1328,6 +1375,40 @@ final class PlayerStore {
             }
         }
         throw lastError ?? APIError.noPlayableSource
+    }
+
+    /// A saved file normally wins. Once the listener picks a quality in the
+    /// player for this session, a file saved at another quality would make
+    /// that choice do nothing, so the stream is tried first.
+    private func prefersStreaming(
+        over downloadedSource: PlaybackSource,
+        for song: Song
+    ) -> Bool {
+        api.isUsingSourceResolver
+            && !song.mid.isEmpty
+            && api.hasSessionPlaybackQuality
+            && downloadedSource.quality != api.playbackQuality
+    }
+
+    private func streamedSource(
+        for song: Song,
+        refreshingSource: Bool,
+        fallingBackTo downloadedSource: PlaybackSource
+    ) async -> PlaybackSource {
+        let streamed = try? await api.playbackSource(
+            for: song,
+            refreshingSource: refreshingSource
+        )
+        // No stream, or one that had to downgrade to no better than the
+        // saved file, is no reason to leave the file.
+        guard let streamed,
+              streamed.quality == api.playbackQuality
+                || LXQualityMapping.rank(of: streamed.quality)
+                    > LXQualityMapping.rank(of: downloadedSource.quality) else {
+            isUsingDownloadedSource = true
+            return downloadedSource
+        }
+        return streamed
     }
 
     private static func isRetryablePlaybackSourceError(_ error: Error) -> Bool {
