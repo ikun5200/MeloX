@@ -37,15 +37,21 @@ final class AudioRendererContext {
         framesRequiredAfterRebuffering = Double(canonicalStream.mSampleRate) * Double(configuration.secondsRequiredToStartPlayingAfterBufferUnderrun)
         framesRequiredForDataAfterSeekPlaying = Double(canonicalStream.mSampleRate) * Double(configuration.gracePeriodAfterSeekInSeconds)
 
-        let dataByteSize = Int(canonicalStream.mSampleRate * configuration.bufferSizeInSeconds) * Int(canonicalStream.mBytesPerFrame)
+        // The sizes below divide by the frame size and narrow to 32 bits;
+        // neither may trap on a format that describes no audio.
+        let bytesPerFrame = max(canonicalStream.mBytesPerFrame, 1)
+        let wantedFrames = canonicalStream.mSampleRate * configuration.bufferSizeInSeconds
+        let frameLimit = Double(UInt32.max / bytesPerFrame)
+        let bufferTotalFrameCount = wantedFrames.isFinite
+            ? UInt32(min(max(wantedFrames, 1), frameLimit))
+            : 1
+        let dataByteSize = Int(bufferTotalFrameCount) * Int(bytesPerFrame)
         inOutAudioBufferList = allocateBufferList(dataByteSize: dataByteSize)
 
         inOutAudioBufferList[0].mBuffers.mNumberChannels = canonicalStream.mChannelsPerFrame
         audioBuffer = inOutAudioBufferList[0].mBuffers
 
-        let bufferTotalFrameCount = UInt32(dataByteSize) / canonicalStream.mBytesPerFrame
-
-        bufferContext = BufferContext(sizeInBytes: canonicalStream.mBytesPerFrame,
+        bufferContext = BufferContext(sizeInBytes: bytesPerFrame,
                                       totalFrameCount: bufferTotalFrameCount)
     }
 

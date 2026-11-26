@@ -20,6 +20,14 @@ enum AudioPlaybackFormat {
                   let description = try? await track.load(.formatDescriptions).first else { return nil }
             format = AVAudioFormat(cmAudioFormatDescription: description)
         }
+        rigTrace("format", "source rate=\(format.sampleRate) channels=\(format.channelCount) layoutTag=\(String(describing: format.channelLayout?.layoutTag))")
+        // Some files are opened without their format being read: QQ's 5.1
+        // FLAC comes back with no channels and no sample rate. Playing to a
+        // format built from that crashed the player, so the player is left
+        // to its own.
+        guard format.sampleRate > 0, format.channelCount > 0 else {
+            return nil
+        }
         if let layout = format.channelLayout {
             return AVAudioFormat(
                 commonFormat: .pcmFormatFloat32,

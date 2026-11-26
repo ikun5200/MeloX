@@ -187,6 +187,7 @@ final class LXPlaybackResolver {
                             sourceName: source.name,
                             qualityVerified: verdict.isVerified
                         )
+                        rigTrace("resolver", "\(song.name): \(name) from \(source.name) is \(verdict.quality), verified \(verdict.isVerified)")
                         if Self.honours(
                             stream,
                             tier: tier,
@@ -214,6 +215,7 @@ final class LXPlaybackResolver {
                         }
                         break
                     } catch {
+                        rigTrace("resolver", "\(song.name): \(name) from \(source.name) rejected, \(error)")
                         lastError = error
                     }
                 }
@@ -311,6 +313,23 @@ final class LXPlaybackResolver {
             )
         }
 
+        rigTrace("resolver", "\(url.lastPathComponent.prefix(4)) answers \(probe.contentType ?? "no type"), \(String(describing: probe.container)), \(probe.length ?? -1) bytes, \(String(describing: probe.flac))")
+        if let flac = probe.flac {
+            // The player decodes to two channels by keeping the front pair
+            // and dropping the rest, which leaves a 5.1 mix without the
+            // centre its voice is on. Such a file is passed over until the
+            // player can fold one down.
+            if flac.channelCount > 2 {
+                throw LXPlaybackError.unplayableStream(
+                    "\(flac.channelCount) 声道"
+                )
+            }
+            if let streamDuration = flac.duration,
+               duration >= 30,
+               streamDuration < duration * 0.6 {
+                throw LXPlaybackError.trialClip
+            }
+        }
         if let length = probe.length {
             if let matched = availability.quality(ofFileSized: length) {
                 return Verdict(quality: matched, isVerified: true)
@@ -370,9 +389,17 @@ final class LXPlaybackResolver {
             "audio/mpeg", "audio/mp3", "audio/aac", "audio/aacp",
             "audio/mp4", "audio/m4a", "audio/x-m4a",
         ]
-        let isLossy = lossyExtensions.contains(
-            url.pathExtension.lowercased()
-        ) || probe.contentType.map(lossyTypes.contains) == true
+        let isLossy: Bool
+        switch probe.container {
+        case .flac, .wave:
+            isLossy = false
+        case .mpeg:
+            isLossy = true
+        case .mpeg4, .ogg, .text, nil:
+            isLossy = lossyExtensions.contains(
+                url.pathExtension.lowercased()
+            ) || probe.contentType.map(lossyTypes.contains) == true
+        }
 
         guard let length = probe.length, duration >= 30 else {
             let isAboveLossy = LXQualityMapping.rank(of: tier)

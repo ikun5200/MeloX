@@ -162,7 +162,7 @@ open class AudioPlayer {
     var entriesQueue: PlayerQueueEntries
 
     public init(configuration: AudioPlayerConfiguration = .default, outputFormat: AVAudioFormat? = nil) {
-        if let outputFormat { self.outputAudioFormat = outputFormat }
+        if let outputFormat, Self.canRender(outputFormat) { self.outputAudioFormat = outputFormat }
         self.configuration = configuration.normalizeValues()
         let engine = AVAudioEngine()
         audioEngine = engine
@@ -199,6 +199,18 @@ open class AudioPlayer {
         configPlayerContext()
         configPlayerNode()
         setupEngine()
+    }
+
+    /// Whether buffers can be laid out for `format`. A caller that could not
+    /// read a file's format hands over one with no channels and no sample
+    /// rate, in which a frame takes no bytes.
+    private static func canRender(_ format: AVAudioFormat) -> Bool {
+        let description = format.streamDescription.pointee
+        return description.mFormatID == kAudioFormatLinearPCM
+            && description.mSampleRate.isFinite
+            && description.mSampleRate > 0
+            && description.mChannelsPerFrame > 0
+            && description.mBytesPerFrame > 0
     }
 
     deinit {

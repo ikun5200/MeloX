@@ -734,12 +734,7 @@ final class PlayerStore {
         including selected: MusicQuality
     ) -> [MusicQuality] {
         if settings.usesAppleMusicQualityOptions {
-            let options = MusicQuality.appleMusicOptions
-            return options.contains(selected)
-                ? options
-                : MusicQuality.allCases.filter {
-                    options.contains($0) || $0 == selected
-                }
+            return MusicQuality.appleMusicOptions
         }
         let sourceQualities = api.sourcePlaybackQualities
         guard !sourceQualities.isEmpty else { return MusicQuality.allCases }
@@ -776,6 +771,12 @@ final class PlayerStore {
         settings.usesAppleMusicQualityOptions = isEnabled
         guard preferredPlaybackQuality != formerPreference else { return }
         applyPreferredQualityToCurrentSong(refreshingSource: false)
+    }
+
+    /// Re-asks the sources for the standing quality, after the tier one of
+    /// Apple Music's options stands for was changed in Settings.
+    func refreshQualityMapping() {
+        applyPreferredQualityToCurrentSong(refreshingSource: true)
     }
 
     /// Quality changes made from the Now Playing screen are scoped to this
@@ -1422,6 +1423,7 @@ final class PlayerStore {
         queueChanged: Bool = false
     ) async {
         guard let song = playbackQueue.currentSong else { return }
+        rigTrace("player", "load \(song.name) startAt=\(startAt) autoplay=\(autoplay)")
         let formerSongID = currentSong?.id
         if song.id != formerSongID {
             playbackRecoveryAttempts = 0
@@ -1493,6 +1495,7 @@ final class PlayerStore {
             effectivePlaybackQuality = source.quality
             let shouldAutoplay = currentLoadShouldAutoplay
             let resolvedStartPosition = estimatedProgress()
+            rigTrace("player", "resolved \(source.format ?? "?") \(String(describing: source.quality)) file=\(source.url.isFileURL); engine.load startAt=\(resolvedStartPosition) autoplay=\(shouldAutoplay)")
             await engine.load(
                 source,
                 startAt: resolvedStartPosition,
@@ -1502,6 +1505,7 @@ final class PlayerStore {
             return
         } catch {
             guard generation == loadGeneration, currentSong?.id == song.id else { return }
+            rigTrace("player", "load failed: \(error)")
             isResolvingSource = false
             isLoading = false
             isPlaying = false
@@ -1680,6 +1684,7 @@ final class PlayerStore {
         let endedSilent = !currentStreamHasPlayed
             && endedAt < expected - 5
         let endedShort = expected >= 30 && reached < expected * 0.6
+        rigTrace("player", "ended at=\(endedAt) engineTime=\(String(describing: engine.currentPlaybackTime)) streamDuration=\(String(describing: currentStreamDuration)) expected=\(expected) silent=\(endedSilent) short=\(endedShort)")
         guard endedSilent || endedShort else {
             return false
         }
@@ -1693,6 +1698,7 @@ final class PlayerStore {
     }
 
     private func handleEngineFailure(_ error: Error) async {
+        rigTrace("player", "engine failure \(error) resolving=\(isResolvingSource) attempts=\(playbackRecoveryAttempts)")
         if isResolvingSource {
             return
         }
@@ -1786,6 +1792,7 @@ final class PlayerStore {
     private func bindEngine() {
         engine.onStateChanged = { [weak self] state in
             guard let self else { return }
+            rigTrace("player", "engine \(state) at \(String(describing: self.engine.currentPlaybackTime))")
             switch state {
             case .idle:
                 self.endSeekPlaybackStateHold()
@@ -1827,6 +1834,7 @@ final class PlayerStore {
         }
         engine.onDurationChanged = { [weak self] value in
             guard let self else { return }
+            rigTrace("player", "engine duration \(value)")
             self.duration = value
             self.currentStreamDuration = value
             self.updateNowPlayingState()
@@ -2546,6 +2554,23 @@ extension PlayerStore {
     /// playback proceeds depends on the volume.
     func debugMuteOutput() {
         engine.setVolume(0)
+    }
+
+    /// What is being streamed, without the address: a source's address
+    /// carries a key that must not reach a log.
+    var debugStreamSummary: String {
+        guard let source = currentPlaybackSource else { return "" }
+        let name = source.url.lastPathComponent
+        let kind = source.url.isFileURL
+            ? "file"
+            : "\(name.prefix(4))….\(source.url.pathExtension)"
+        return [
+            source.sourceName ?? "?",
+            kind,
+            source.format ?? "?",
+            source.bitrate.map { "\($0 / 1_000)kbps" } ?? "?",
+            source.qualityVerified ? "verified" : "unverified",
+        ].joined(separator: " | ")
     }
 
     /// Raises a playback error with nothing else happening, to observe how
