@@ -13,6 +13,9 @@ final class AudioPlaybackDeck: NSObject, @preconcurrency AudioPlayerDelegate {
     private(set) var itemID: UUID?
     private(set) var error: Error?
     private(set) var channelCount: AVAudioChannelCount = 2
+    /// What the decoder was opened with, for the diagnostics panel.
+    private(set) var decodedSampleRate: Double?
+    private(set) var decodedIsInterleaved: Bool?
     private var player: AudioStreaming.AudioPlayer?
     private var formatTask: Task<Void, Never>?
     private var loadContinuation: CheckedContinuation<Bool, Never>?
@@ -123,6 +126,8 @@ final class AudioPlaybackDeck: NSObject, @preconcurrency AudioPlayerDelegate {
             outputFormat: format)
         self.player = player
         channelCount = format?.channelCount ?? 2
+        decodedSampleRate = format?.sampleRate
+        decodedIsInterleaved = format?.isInterleaved
         player.volume = 0
         player.delegate = self
         equalizer.attach(to: player)

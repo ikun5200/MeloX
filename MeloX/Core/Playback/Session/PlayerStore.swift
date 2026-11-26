@@ -1,3 +1,4 @@
+import AVFAudio
 import Foundation
 import Observation
 import OSLog
@@ -100,6 +101,194 @@ final class PlayerStore {
     func currentQualityEvidence(for tier: MusicQuality) -> LXQualityEvidence {
         guard let currentSong else { return .untested }
         return api.sourceEvidence(for: currentSong, quality: tier)
+    }
+
+    /// Everything the diagnostics panel shows, read on demand so it costs
+    /// nothing while nobody is looking at it.
+    func playbackDiagnostics() -> PlaybackDiagnostics {
+        var sections: [PlaybackDiagnostics.Section] = []
+        let song = currentSong
+        let source = currentPlaybackSource
+
+        if let song {
+            var rows: [PlaybackDiagnostics.Row] = [
+                .init(label: "Title", value: song.name),
+                .init(label: "Artists", value: song.artistText),
+                .init(label: "Album", value: song.album?.name ?? "—"),
+                .init(label: "Duration", value: song.durationText),
+                .init(label: "Song ID", value: String(song.id)),
+                .init(label: "MID", value: song.mid.isEmpty ? "—" : song.mid),
+                .init(label: "Media MID", value: song.mediaMID ?? "—"),
+                .init(label: "Queue", value: "\(currentIndex + 1)/\(queue.count)"),
+                .init(
+                    label: "Mode",
+                    value: [
+                        repeatMode.rawValue,
+                        isShuffled ? "shuffle" : "order",
+                        isAutoMixEnabled ? "automix" : "plain",
+                    ].joined(separator: " · ")
+                ),
+            ]
+            let local = downloads.localPlaybackSource(songID: song.id) != nil
+            rows.append(.init(label: "Local file", value: local ? "yes" : "no"))
+            sections.append(.init(title: "Song", rows: rows))
+
+            var qualityRows: [PlaybackDiagnostics.Row] = [
+                .init(
+                    label: "Chosen",
+                    value: settings.usesAppleMusicQualityOptions
+                        ? "\(settings.title(for: selectedPlaybackQualityOption))"
+                            + " → \(preferredPlaybackQuality.title)"
+                        : preferredPlaybackQuality.title
+                ),
+                .init(label: "Requested", value: api.playbackQuality.title),
+                .init(
+                    label: "Playing",
+                    value: effectivePlaybackQuality?.title ?? "—"
+                ),
+                .init(
+                    label: "Verified",
+                    value: isCurrentQualityVerified ? "yes" : "no"
+                ),
+            ]
+            if let notice = playbackQualityNotice {
+                qualityRows.append(.init(label: "Notice", value: notice))
+            }
+            if isSwitchingPlaybackQuality {
+                qualityRows.append(.init(label: "Switching", value: "yes"))
+            }
+            qualityRows.append(.init(
+                label: "Source revision",
+                value: String(api.sourceConfigurationRevision)
+            ))
+            qualityRows.append(.init(
+                label: "Next track",
+                value: debugNextPreparation
+            ))
+            sections.append(.init(title: "Quality", rows: qualityRows))
+
+            let tiersText = MusicQuality.allCases.map { tier in
+                let evidence = api.sourceEvidence(for: song, quality: tier)
+                let mark = switch evidence {
+                case .verified: "✓"
+                case .unavailable: "✗"
+                case .untested: "?"
+                }
+                let catalog = song.audioAvailability.fileSize(of: tier)
+                    .map(PlaybackDiagnostics.bytes) ?? "—"
+                return "\(tier.title) \(mark) \(catalog)"
+            }
+            sections.append(.init(
+                title: "Tiers (✓ verified · ✗ unavailable · ? untested · QQ catalog size)",
+                rows: [.init(label: "Per tier", value: tiersText.joined(separator: "\n"))]
+            ))
+        }
+
+        if let source {
+            var rows: [PlaybackDiagnostics.Row] = []
+            if let name = source.sourceName {
+                rows.append(.init(label: "Source", value: name))
+            }
+            rows.append(.init(
+                label: "Address",
+                value: PlaybackDiagnostics.maskedAddress(source.url)
+            ))
+            rows.append(.init(label: "Container", value: source.format ?? "—"))
+            if let bitrate = source.bitrate, bitrate > 0 {
+                rows.append(.init(
+                    label: "Bitrate",
+                    value: "\(bitrate / 1_000) kbps"
+                ))
+            }
+            if let asked = source.requestedQuality {
+                rows.append(.init(label: "Asked as", value: asked.title))
+            }
+            if let actual = source.quality {
+                rows.append(.init(label: "Delivered", value: actual.title))
+            }
+            rows.append(.init(
+                label: "Verified",
+                value: source.qualityVerified ? "yes" : "estimated"
+            ))
+            rows.append(.init(
+                label: "Forward buffer",
+                value: String(format: "%.0f s", source.preferredForwardBufferDuration)
+            ))
+            sections.append(.init(title: "Stream", rows: rows))
+        }
+
+        var audioRows: [PlaybackDiagnostics.Row] = [
+            .init(label: "Engine", value: String(describing: engine.state)),
+            .init(
+                label: "Position",
+                value: String(
+                    format: "%.2f / %.2f s",
+                    estimatedProgress(),
+                    duration
+                )
+            ),
+            .init(
+                label: "Volume",
+                value: String(format: "%.2f", volume)
+            ),
+        ]
+        for (index, deck) in engine.deckReports.enumerated() {
+            let role = deck.isActive ? "active" : "standby"
+            let rate = deck.sampleRate.map { String(format: "%.0f Hz", $0) } ?? "—"
+            let interleaved = deck.isInterleaved.map { $0 ? "interleaved" : "planar" } ?? "—"
+            audioRows.append(.init(
+                label: "Deck \(index) (\(role))",
+                value: "\(deck.state) · \(rate) · \(deck.channels) ch · \(interleaved)"
+            ))
+            let position = deck.position.map { String(format: "%.2f s", $0) } ?? "—"
+            let stream = deck.streamDuration.map { String(format: "%.2f s", $0) } ?? "—"
+            audioRows.append(.init(
+                label: "Deck \(index) position",
+                value: "\(position) of \(stream)"
+                    + (deck.isPrerolled ? " · prerolled" : "")
+                    + (deck.hasError ? " · error" : "")
+            ))
+        }
+        #if os(iOS)
+        let session = AVAudioSession.sharedInstance()
+        audioRows.append(.init(
+            label: "Session",
+            value: "\(session.category.rawValue) · \(session.mode.rawValue)"
+        ))
+        audioRows.append(.init(
+            label: "Session rate",
+            value: String(
+                format: "%.0f Hz · IO buffer %.1f ms",
+                session.sampleRate,
+                session.ioBufferDuration * 1_000
+            )
+        ))
+        audioRows.append(.init(
+            label: "Output latency",
+            value: String(
+                format: "%.1f ms · %.1f ms in",
+                session.outputLatency * 1_000,
+                session.inputLatency * 1_000
+            )
+        ))
+        let route = session.currentRoute.outputs.first
+        audioRows.append(.init(
+            label: "Route",
+            value: route.map { "\($0.portName) · \($0.portType.rawValue)" } ?? "—"
+        ))
+        audioRows.append(.init(
+            label: "Other audio",
+            value: session.isOtherAudioPlaying ? "playing" : "silent"
+        ))
+        audioRows.append(.init(
+            label: "Network",
+            value: api.isCellularData ? "cellular" : "wifi"
+                + (api.isNetworkAvailable ? "" : " · offline")
+        ))
+        #endif
+        sections.append(.init(title: "Audio", rows: audioRows))
+
+        return PlaybackDiagnostics(sections: sections, copiedAt: Date())
     }
 
     private var playbackQueue = PlaybackQueue() {

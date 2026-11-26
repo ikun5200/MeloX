@@ -365,7 +365,7 @@
 "ui.settings.catalog.about.keywords" = "GitHub|Telegram|更新日志|检查更新|声明";
 "ui.settings.catalog.developer.title" = "开发者选项";
 "ui.settings.catalog.developer.subtitle" = "BeatNet 分析与播放器调试工具";
-"ui.settings.catalog.developer.keywords" = "BeatNet|节拍|重拍|Onset|调试|Core ML|全曲分析";
+"ui.settings.catalog.developer.keywords" = "BeatNet|节拍|重拍|Onset|调试|诊断|播放诊断|音质|音频|Core ML|全曲分析";
 "ui.settings.catalog.account.keywords" = "QQ 音乐账号|登录|退出登录|凭证|个人主页|用户 ID";
 "ui.settings.catalog.reset.keywords" = "恢复播放器默认设置|重置|还原|播放器|歌词|均衡器|自动混音";
 
@@ -401,6 +401,9 @@
 "ui.settings.content_features.section" = "可选功能";
 "ui.settings.content_features.footer" = "关闭后会隐藏相关入口并停止主动载入对应内容，不会删除收藏、下载或播放记录。";
 "ui.settings.developer.beatnet_panel" = "BeatNet 实时调试面板";
+"ui.settings.diagnostics.playback.title" = "播放诊断";
+"ui.settings.diagnostics.copy" = "复制";
+"ui.settings.diagnostics.copied" = "已复制";
 "ui.settings.developer.entry" = "入口";
 "ui.settings.developer.entry.value" = "播放器“…”菜单";
 "ui.settings.developer.debug.section" = "调试";

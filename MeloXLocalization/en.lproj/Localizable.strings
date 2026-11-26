@@ -365,7 +365,7 @@
 "ui.settings.catalog.about.keywords" = "GitHub|Telegram|release notes|check for updates|disclaimer";
 "ui.settings.catalog.developer.title" = "Developer Options";
 "ui.settings.catalog.developer.subtitle" = "BeatNet analysis and player debugging tools";
-"ui.settings.catalog.developer.keywords" = "BeatNet|beat|downbeat|Onset|debug|Core ML|full-track analysis";
+"ui.settings.catalog.developer.keywords" = "BeatNet|beat|downbeat|Onset|debug|Core ML|full-track analysis|Diagnostics|Playback diagnostics|audio|quality";
 "ui.settings.catalog.account.keywords" = "QQ Music account|sign in|sign out|credential|profile|user ID";
 "ui.settings.catalog.reset.keywords" = "restore default player settings|reset|restore|player|lyrics|equalizer|AutoMix";
 
@@ -401,6 +401,9 @@
 "ui.settings.content_features.section" = "Optional Features";
 "ui.settings.content_features.footer" = "Disabling a module hides its entry points and stops loading its content. Favorites, downloads, and playback history are not deleted.";
 "ui.settings.developer.beatnet_panel" = "BeatNet Live Debug Panel";
+"ui.settings.diagnostics.playback.title" = "Playback Diagnostics";
+"ui.settings.diagnostics.copy" = "Copy";
+"ui.settings.diagnostics.copied" = "Copied";
 "ui.settings.developer.entry" = "Entry Point";
 "ui.settings.developer.entry.value" = "Player More (…) Menu";
 "ui.settings.developer.debug.section" = "Debugging";

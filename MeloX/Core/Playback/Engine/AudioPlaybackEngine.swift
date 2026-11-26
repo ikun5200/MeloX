@@ -67,6 +67,37 @@ final class AudioPlaybackEngine {
     var currentPlaybackTime: TimeInterval? { activeDeck.currentPlaybackTime }
     var expectsPlaybackToContinue: Bool { wantsPlayback }
     var hasPreparedAutoMix: Bool { autoMixController.hasPreparedTransition }
+
+    /// One deck as the diagnostics panel sees it.
+    struct DeckReport: Sendable {
+        let isActive: Bool
+        let state: String
+        let itemIdentifier: Int?
+        let sampleRate: Double?
+        let channels: Int
+        let isInterleaved: Bool?
+        let position: TimeInterval?
+        let streamDuration: TimeInterval?
+        let isPrerolled: Bool
+        let hasError: Bool
+    }
+
+    var deckReports: [DeckReport] {
+        decks.enumerated().map { index, deck in
+            DeckReport(
+                isActive: index == activeDeckIndex,
+                state: String(describing: deck.state),
+                itemIdentifier: deck.itemIdentifier,
+                sampleRate: deck.decodedSampleRate,
+                channels: Int(deck.channelCount),
+                isInterleaved: deck.decodedIsInterleaved,
+                position: deck.currentPlaybackTime,
+                streamDuration: deck.playbackDuration,
+                isPrerolled: deck.isPrerolled,
+                hasError: deck.error != nil
+            )
+        }
+    }
     #if os(iOS)
     var audioSpectrumSnapshot: PlaybackAudioSpectrumSnapshot { activeDeck.spectrumSnapshot }
     #endif

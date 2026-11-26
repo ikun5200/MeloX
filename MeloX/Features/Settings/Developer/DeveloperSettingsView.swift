@@ -17,6 +17,15 @@ struct DeveloperSettingsView: View {
                     L10n.string("ui.settings.developer.entry"),
                     value: L10n.string("ui.settings.developer.entry.value")
                 )
+
+                NavigationLink {
+                    PlaybackDiagnosticsView()
+                } label: {
+                    Label(
+                        "ui.settings.diagnostics.playback.title",
+                        systemImage: "waveform.badge.magnifyingglass"
+                    )
+                }
             } header: {
                 Text("ui.settings.developer.debug.section")
             } footer: {
