@@ -6,6 +6,7 @@ struct NowPlayingSongActions: View {
     @Environment(LibraryStore.self) private var library
     @Environment(PlayerStore.self) private var player
     @Environment(NeteaseAPI.self) private var api
+    @Environment(FloatingLyricsController.self) private var floatingLyrics
 
     let song: Song
     var showsFavoriteButton = true
@@ -68,6 +69,27 @@ struct NowPlayingSongActions: View {
         Menu {
             if !api.isUsingSourceResolver {
                 lyricsSourceMenu
+                Divider()
+            }
+            if !song.isPodcastProgram {
+                Button {
+                    floatingLyrics.toggle()
+                } label: {
+                    Label(
+                        floatingLyrics.isActive
+                            ? L10n.string("ui.floating_lyrics.close")
+                            : L10n.string("ui.floating_lyrics.open"),
+                        systemImage: floatingLyrics.isActive
+                            ? "pip.exit"
+                            : "pip.enter"
+                    )
+                }
+                .disabled(
+                    player.currentSong == nil
+                        || (!floatingLyrics.isActive
+                            && !floatingLyrics.isPossible)
+                )
+
                 Divider()
             }
             Button {

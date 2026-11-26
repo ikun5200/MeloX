@@ -1406,6 +1406,7 @@
 "ui.player.volume" = "Player Volume";
 "ui.player.system_volume" = "System Volume";
 "ui.player.queue" = "Playback Queue";
+"ui.player.airplay" = "AirPlay";
 "ui.player.continue_playing" = "Continue Playing";
 "ui.player.no_up_next" = "No Songs Up Next";
 "ui.player.shuffle_off" = "Turn Off Shuffle";

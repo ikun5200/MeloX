@@ -4,6 +4,8 @@
 
 ### 简体中文
 
+- 2.1.4：播放页底部中间的按钮改为隔空投送（AirPlay），可直接把播放送到其他设备；悬浮歌词开关移入封面右上角的「…」菜单。
+- 调节进度条或音量后，底部控制面板会在几秒后自动淡出，轻点面板区域即可重新显示。
 - 2.1.3：新增「播放诊断」（设置 → 关于 → 开发者选项 → 播放诊断）。可查看当前歌曲与音质证据、音源实际交付的格式，以及两路播放器的采样率、声道、缓冲、音频会话与输出路由，支持一键复制全文。
 - 2.1.2：播放音质按当前音源实际返回的文件判定；QQ 资料漏报某一档不会限制尝试。「未检测」不再写成「本曲暂无」，降档只影响当前歌曲。
 - 普通播放在曲尾提前约 60 秒选好并缓冲下一首。切歌复用已完成或正在进行的请求；预取失败不会提前停止当前歌曲。
@@ -30,6 +32,8 @@
 
 ### English
 
+- 2.1.4 turns the middle button on the player's bottom row into AirPlay, so playback can be sent to other devices; the Floating Lyrics toggle moved into the “…” menu beside the artwork.
+- After adjusting the progress or the volume, the bottom panel fades out a few seconds later; tapping the panel brings it back.
 - 2.1.3 adds Playback Diagnostics (Settings → About → Developer Options): the current song, per-tier evidence, the stream a source delivered, both decks' sample rate and channels, and the audio session and output route, with a copy-all button.
 - In 2.1.2, playback quality is checked against the file delivered by the source. A tier missing from QQ’s catalog response can still be tried. Unverified tiers are no longer labelled as absent, and falling back does not change the preference for the next song.
 - During ordinary playback, MeloX selects and buffers the next track with about 60 seconds remaining. Advancing reuses the prepared track or the ongoing request. Preparation failures do not stop the outgoing track early.

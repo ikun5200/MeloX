@@ -25,6 +25,9 @@ struct NowPlayingView: View {
     @State private var hasDisplayDivision = false
     @State private var viewportSize = CGSize.zero
     @State private var showsFullScreenLyrics = false
+    @State private var controlActivityGeneration = 0
+    @State private var hidesControlsForInactivity = false
+    @State private var isAdjustingControls = false
     @Namespace private var pageArtworkNamespace
 
     private var page: NowPlayingPage {
@@ -215,14 +218,17 @@ struct NowPlayingView: View {
                 showsLyricsControls = false
             }
         }
+        .task(id: controlActivityGeneration) {
+            await hideControlsAfterInactivity()
+        }
         .task(id: transitionSettlementTaskID) {
             await settlePageTransition()
-        }
-        .task(id: lyricsEntranceTaskID) {
+        }        .task(id: lyricsEntranceTaskID) {
             await presentLyricsEntrance()
         }
         .onChange(of: page) { _, newPage in
             showsFullScreenLyrics = false
+            revealControls()
             if newPage == .lyrics,
                settings.lyricsStyle == .appleMusic {
                 registerAppleMusicControlsActivity()
@@ -275,6 +281,12 @@ struct NowPlayingView: View {
         }
         .onAppear {
             resetPodcastPageIfNeeded()
+        }
+        .onChange(of: player.isPlaying) { _, isPlaying in
+            // A paused player needs its transport row visible.
+            if !isPlaying {
+                revealControls()
+            }
         }
         .onChange(of: player.currentSong?.id) {
             resetPodcastPageIfNeeded()
@@ -365,8 +377,8 @@ struct NowPlayingView: View {
     ) -> some View {
         ZStack(alignment: .bottom) {
             portraitPlayerControls(for: song)
-                .allowsHitTesting(!hidesLyricsControls)
-                .accessibilityHidden(hidesLyricsControls)
+                .allowsHitTesting(!hidesPlayerInterface)
+                .accessibilityHidden(hidesPlayerInterface)
 
             if hidesLyricsControls,
                settings.lyricsStyle != .appleMusic {
@@ -380,6 +392,18 @@ struct NowPlayingView: View {
                         handleLyricsInterfaceInteraction()
                     }
                     .accessibilityHidden(true)
+            } else if hidesControlsForInactivity {
+                Color.clear
+                    .frame(maxWidth: .infinity)
+                    .frame(
+                        height: NowPlayingBottomControls.overlayHeight
+                    )
+                    .contentShape(.rect)
+                    .onTapGesture {
+                        revealControls(restartsCountdown: true)
+                    }
+                    .accessibilityLabel("ui.player.show_controls")
+                    .accessibilityAddTraits(.isButton)
             }
         }
         .frame(height: NowPlayingBottomControls.overlayHeight)
@@ -393,7 +417,8 @@ struct NowPlayingView: View {
                 usesExpandedAppleMusicLyricsLayout,
             hasLyricsTranslations: hasLyricsTranslations,
             hasLyricsRomanizations: hasLyricsRomanizations,
-            isInterfaceHidden: hidesLyricsControls
+            isInterfaceHidden: hidesPlayerInterface,
+            onControlAdjustmentChanged: handleControlAdjustment
         )
     }
 
@@ -415,6 +440,12 @@ struct NowPlayingView: View {
 
     private var hidesLyricsControls: Bool {
         page == .lyrics && !showsLyricsControls
+    }
+
+    /// The bottom panel is either hidden with the lyrics interface or because
+    /// the listener stopped adjusting it a few seconds ago.
+    private var hidesPlayerInterface: Bool {
+        hidesLyricsControls || hidesControlsForInactivity
     }
 
     private var usesAutoHidingAppleMusicInterface: Bool {
@@ -1076,6 +1107,7 @@ struct NowPlayingView: View {
     }
 
     private func handleLyricsInterfaceInteraction() {
+        revealControls()
         if settings.lyricsStyle == .appleMusic {
             registerAppleMusicControlsActivity()
         } else {
@@ -1102,6 +1134,7 @@ struct NowPlayingView: View {
     private func setAppleMusicLyricsControlsVisible(_ isVisible: Bool) {
         guard usesAutoHidingAppleMusicInterface else { return }
         if isVisible {
+            revealControls()
             registerAppleMusicControlsActivity()
             return
         }
@@ -1136,6 +1169,71 @@ struct NowPlayingView: View {
         appleMusicControlsActivityGeneration &+= 1
     }
 
+    /// Called while a scrubber or the volume slider is being dragged. The
+    /// panel stays up during the drag; the countdown starts on release.
+    private func handleControlAdjustment(isAdjusting: Bool) {
+        guard isAdjusting != isAdjustingControls else { return }
+
+        isAdjustingControls = isAdjusting
+        revealControls(restartsCountdown: true)
+    }
+
+    /// Fades the bottom panel back in. Only a fresh adjustment or a touch on
+    /// the panel restarts the countdown; arriving on a page does not.
+    private func revealControls(restartsCountdown: Bool = false) {
+        if hidesControlsForInactivity {
+            withAnimation(
+                NowPlayingInterfaceTransition.interfaceAnimation(
+                    isVisible: true,
+                    reducesMotion: accessibilityReduceMotion
+                )
+            ) {
+                hidesControlsForInactivity = false
+            }
+        }
+        if restartsCountdown {
+            controlActivityGeneration &+= 1
+        }
+    }
+
+    /// Hides the bottom panel a few seconds after the last adjustment, so a
+    /// scrubbed song or a nudged volume does not leave the panel covering the
+    /// artwork. Any touch on the panel brings it back. Opening the player is
+    /// not an adjustment: with no interaction yet there is no countdown.
+    private func hideControlsAfterInactivity() async {
+        guard controlActivityGeneration > 0,
+              !isAdjustingControls,
+              player.isPlaying,
+              !accessibilityVoiceOverEnabled,
+              !hidesLyricsControls,
+              !hidesControlsForInactivity else {
+            return
+        }
+
+        do {
+            try await Task.sleep(
+                for: .seconds(
+                    settings.appleMusicLyricsInterfaceAutoHideDelay
+                )
+            )
+        } catch {
+            return
+        }
+        guard !Task.isCancelled,
+              !isAdjustingControls,
+              player.isPlaying else {
+            return
+        }
+
+        withAnimation(
+            NowPlayingInterfaceTransition.interfaceAnimation(
+                isVisible: false,
+                reducesMotion: accessibilityReduceMotion
+            )
+        ) {
+            hidesControlsForInactivity = true
+        }
+    }
 }
 
 private struct NowPlayingBeatAnalysisTaskID: Equatable {

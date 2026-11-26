@@ -14,6 +14,7 @@ struct NowPlayingBottomControls: View {
     let hasLyricsTranslations: Bool
     let hasLyricsRomanizations: Bool
     let isInterfaceHidden: Bool
+    var onControlAdjustmentChanged: (Bool) -> Void = { _ in }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -34,7 +35,10 @@ struct NowPlayingBottomControls: View {
     private var coreControls: some View {
         VStack(spacing: 0) {
             interfaceLayer(.progress) {
-                NowPlayingProgressControl(song: song)
+                NowPlayingProgressControl(
+                    song: song,
+                    onAdjustingChanged: onControlAdjustmentChanged
+                )
             }
 
             Color.clear
@@ -48,7 +52,9 @@ struct NowPlayingBottomControls: View {
                 .frame(height: 31)
 
             interfaceLayer(.volume) {
-                NowPlayingVolumeControl()
+                NowPlayingVolumeControl(
+                    onAdjustingChanged: onControlAdjustmentChanged
+                )
             }
 
             Color.clear

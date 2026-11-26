@@ -5,6 +5,7 @@ struct NowPlayingProgressControl: View {
     @Environment(PlayerStore.self) private var player
 
     let song: Song
+    var onAdjustingChanged: (Bool) -> Void = { _ in }
 
     var body: some View {
         VStack(spacing: 2) {
@@ -15,6 +16,7 @@ struct NowPlayingProgressControl: View {
                 ),
                 in: 0...progressMaximum
             )
+            .simultaneousGesture(adjustmentGesture)
             .sliderThumbVisibility(.hidden)
             .tint(.white)
             .accessibilityLabel("ui.player.progress")
@@ -54,6 +56,14 @@ struct NowPlayingProgressControl: View {
 
     private var progressMaximum: TimeInterval {
         max(player.duration, TimeInterval(song.durationMS) / 1_000, 1)
+    }
+
+    /// A tap on the track moves the thumb without an editing callback, so
+    /// follow the touch itself: it covers both taps and drags.
+    private var adjustmentGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { _ in onAdjustingChanged(true) }
+            .onEnded { _ in onAdjustingChanged(false) }
     }
 
     private func formatTime(_ value: TimeInterval) -> String {
@@ -376,6 +386,8 @@ struct NowPlayingVolumeControl: View {
     @Environment(PlayerStore.self) private var player
     @Environment(AppSettings.self) private var settings
 
+    var onAdjustingChanged: (Bool) -> Void = { _ in }
+
     @ViewBuilder
     var body: some View {
         if settings.playerVolumeControlMode != .hidden {
@@ -409,10 +421,15 @@ struct NowPlayingVolumeControl: View {
                 ),
                 in: 0...1
             )
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in onAdjustingChanged(true) }
+                    .onEnded { _ in onAdjustingChanged(false) }
+            )
             .tint(.white)
             .accessibilityLabel("ui.player.volume")
         case .system:
-            SystemVolumeSlider()
+            SystemVolumeSlider(onAdjustingChanged: onAdjustingChanged)
                 .accessibilityLabel("ui.player.system_volume")
         }
     }
@@ -425,6 +442,12 @@ private final class AlignedSystemVolumeView: MPVolumeView {
 }
 
 private struct SystemVolumeSlider: UIViewRepresentable {
+    var onAdjustingChanged: (Bool) -> Void = { _ in }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onAdjustingChanged: onAdjustingChanged)
+    }
+
     func makeUIView(context: Context) -> AlignedSystemVolumeView {
         let volumeView = AlignedSystemVolumeView(
             frame: CGRect(x: 0, y: 0, width: 200, height: 32)
@@ -432,6 +455,7 @@ private struct SystemVolumeSlider: UIViewRepresentable {
         volumeView.backgroundColor = .clear
         volumeView.showsVolumeSlider = true
         volumeView.tintColor = .white
+        context.coordinator.attach(to: volumeView)
         return volumeView
     }
 
@@ -441,6 +465,8 @@ private struct SystemVolumeSlider: UIViewRepresentable {
     ) {
         volumeView.showsVolumeSlider = true
         volumeView.tintColor = .white
+        context.coordinator.onAdjustingChanged = onAdjustingChanged
+        context.coordinator.attach(to: volumeView)
     }
 
     func sizeThatFits(
@@ -452,6 +478,63 @@ private struct SystemVolumeSlider: UIViewRepresentable {
             width: proposal.width ?? 200,
             height: proposal.height ?? 32
         )
+    }
+
+    /// `MPVolumeView` owns its slider and exposes no editing callback, so
+    /// follow the slider it builds. Only the touch phases are needed: they
+    /// mark the start and the end of a drag.
+    @MainActor
+    final class Coordinator: NSObject {
+        var onAdjustingChanged: (Bool) -> Void
+        private weak var slider: UISlider?
+
+        init(onAdjustingChanged: @escaping (Bool) -> Void) {
+            self.onAdjustingChanged = onAdjustingChanged
+        }
+
+        func attach(to view: MPVolumeView) {
+            guard slider == nil,
+                  let slider = Self.firstSlider(in: view) else {
+                return
+            }
+            self.slider = slider
+            slider.addTarget(
+                self,
+                action: #selector(handleTouchDown),
+                for: .touchDown
+            )
+            for phase in [
+                UIControl.Event.touchUpInside,
+                .touchUpOutside,
+                .touchCancel,
+            ] {
+                slider.addTarget(
+                    self,
+                    action: #selector(handleTouchEnd),
+                    for: phase
+                )
+            }
+        }
+
+        @objc private func handleTouchDown() {
+            onAdjustingChanged(true)
+        }
+
+        @objc private func handleTouchEnd() {
+            onAdjustingChanged(false)
+        }
+
+        private static func firstSlider(in view: UIView) -> UISlider? {
+            for subview in view.subviews {
+                if let slider = subview as? UISlider {
+                    return slider
+                }
+                if let slider = firstSlider(in: subview) {
+                    return slider
+                }
+            }
+            return nil
+        }
     }
 }
 
@@ -492,7 +575,7 @@ struct NowPlayingPageSelector: View {
 
                     Spacer()
 
-                    FloatingLyricsButton()
+                    AirPlayRouteButton(tint: .white.opacity(0.72))
 
                     Spacer()
 
