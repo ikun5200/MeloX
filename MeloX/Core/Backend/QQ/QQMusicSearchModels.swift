@@ -188,13 +188,17 @@ nonisolated enum QQMusicSearchParser {
 
     static func artist(_ item: [String: Any]) -> QQSearchArtist? {
         let mid = string(item, "singerMID", "mid", "singerMid") ?? ""
-        let id = int(item, "singerID", "id", "singerId", "singer_id")
-            ?? stableID(mid)
-        guard id > 0 || !mid.isEmpty else { return nil }
         let name = plain(
             string(item, "singerName", "name", "title") ?? ""
         )
         guard !name.isEmpty else { return nil }
+        // An album's singer list can name an artist with no account behind
+        // it: QQ leaves the id at 0 and the mid empty.
+        let stored = int(item, "singerID", "id", "singerId", "singer_id") ?? 0
+        let id = stored > 0
+            ? stored
+            : (mid.isEmpty ? stableID(name) : stableID(mid))
+        guard id > 0 else { return nil }
         let avatar = string(item, "singerPic", "pic", "picUrl")
             ?? singerCoverURL(mid: mid)
         return QQSearchArtist(
@@ -216,35 +220,51 @@ nonisolated enum QQMusicSearchParser {
         )
         guard !name.isEmpty else { return nil }
 
-        let artistValues = (item["singer"] as? [Any])
-            ?? (item["singer_list"] as? [Any])
-            ?? (item["singers"] as? [Any])
-            ?? []
-        let artists = artistValues.compactMap { value -> QQSearchArtist? in
-            if let dictionary = value as? [String: Any] {
-                return artist(dictionary)
-            }
-            if let name = value as? String, !name.isEmpty {
-                return QQSearchArtist(
-                    id: 0,
-                    mid: "",
-                    name: name,
-                    avatarURL: nil,
-                    isFollowed: false
-                )
-            }
-            return nil
-        }
-
         return QQSearchAlbum(
             id: id,
             mid: mid,
             name: name,
             coverURL: string(item, "pic", "picUrl", "logo")
                 ?? albumCoverURL(mid: mid),
-            artists: artists,
+            artists: artists(of: item),
             publishDate: string(item, "publish_date", "time_public", "pubtime")
         )
+    }
+
+    /// An album's artists. The same list arrives as `singer` (an array, or
+    /// one name as text), `singer_list` or `singers`, depending on the
+    /// endpoint and on how complete QQ's record is; the first that names
+    /// anyone wins.
+    private static func artists(of item: [String: Any]) -> [QQSearchArtist] {
+        for key in ["singer", "singer_list", "singers"] {
+            guard let value = item[key], !(value is NSNull) else { continue }
+            var names: [String] = []
+            if let list = value as? [Any] {
+                names = list.compactMap { element in
+                    if let dictionary = element as? [String: Any] {
+                        return artist(dictionary)?.name
+                    }
+                    return (element as? String).map(plain)
+                }
+            } else if let text = value as? String {
+                // Tags come off first: QQ marks the matched words with
+                // `<em>`, and a closing tag holds a slash.
+                names = plain(text)
+                    .split(whereSeparator: { $0 == "/" || $0 == "、" || $0 == "," })
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+            }
+            let artists = names.filter { !$0.isEmpty }.map { name in
+                QQSearchArtist(
+                    id: stableID(name),
+                    mid: "",
+                    name: name,
+                    avatarURL: nil,
+                    isFollowed: false
+                )
+            }
+            if !artists.isEmpty { return artists }
+        }
+        return []
     }
 
     static func playlist(_ item: [String: Any]) -> QQSearchPlaylist? {

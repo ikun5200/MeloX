@@ -8,6 +8,11 @@ struct SearchView: View {
 
     @State private var query = ""
     @State private var suggestions: [String] = []
+    @FocusState private var isSearchFocused: Bool
+    /// The words whose results the screen is showing. Suggestions belong to
+    /// words still being typed, so they stay away once a search is made, even
+    /// when the field takes focus again on the way back from a result.
+    @State private var submittedQuery = ""
     @State private var resultCache = SearchResultCache()
     @State private var scope: SearchKind = .songs
     @State private var phase: LoadingPhase = .loaded
@@ -41,14 +46,23 @@ struct SearchView: View {
             placement: .navigationBarDrawer(displayMode: .always),
             prompt: "ui.search.prompt"
         )
+        .searchFocused($isSearchFocused)
+        .onSubmit(of: .search) {
+            submittedQuery = trimmedQuery
+        }
         .searchSuggestions {
-            if settings.searchSuggestionsEnabled {
+            if settings.searchSuggestionsEnabled, showsSuggestions {
                 ForEach(suggestions, id: \.self) { suggestion in
                     Label {
                         Text(verbatim: suggestion)
+                            .foregroundStyle(.primary)
                     } icon: {
                         Image(systemName: "magnifyingglass")
+                            .foregroundStyle(.secondary)
                     }
+                    // The app's accent colour would paint the whole
+                    // suggestion; Apple's own lists leave it plain.
+                    .tint(.primary)
                     .searchCompletion(suggestion)
                 }
             }
@@ -62,7 +76,9 @@ struct SearchView: View {
             }
         }
         .overlay {
-            if !trimmedQuery.isEmpty, case .failed(let message) = phase {
+            if !showsSuggestions,
+               !trimmedQuery.isEmpty,
+               case .failed(let message) = phase {
                 ContentUnavailableView(
                     recognizedLink == nil
                         ? L10n.string("ui.search.failed")
@@ -256,6 +272,14 @@ struct SearchView: View {
 
     private var trimmedQuery: String {
         query.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Suggestions are for words being typed, and only while the field has
+    /// focus, so they never sit on top of the results of a search made.
+    private var showsSuggestions: Bool {
+        isSearchFocused
+            && !trimmedQuery.isEmpty
+            && trimmedQuery != submittedQuery
     }
 
     private var resultIsEmpty: Bool {

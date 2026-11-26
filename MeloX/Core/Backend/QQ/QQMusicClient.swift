@@ -1265,9 +1265,6 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
             "cv": "20090008",
             "v": "20090008",
             "chid": "10003505",
-            "qq": credential?.isValid == true
-                ? String(credential?.musicID ?? 0)
-                : guid,
             "tmeAppID": "qqmusic",
             "traceid": "10002_\(uidPart)_\(timestamp)",
             "QIMEI36": qimei36,
@@ -1281,7 +1278,11 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
             comm["uid"] = session.uid
             comm["sid"] = session.sid
         }
+        // `qq` 是账号号码，只在登录后发送。未登录时若填入别的内容（此前
+        // 填的是随机设备串），QQ 会按该串把专辑、歌手、歌单搜索过滤成空，
+        // 实测约四成的随机串会中招。
         if let credential, credential.isValid {
+            comm["qq"] = String(credential.musicID)
             comm["authst"] = credential.musicKey
             comm["tmeLoginType"] = credential.loginType
         }
