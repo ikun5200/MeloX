@@ -78,16 +78,17 @@ final class NeteaseAPI {
     private var sessionPlaybackQuality: MusicQuality?
     private var sessionCellularPlaybackQuality: MusicQuality?
 
-    var playbackQuality: MusicQuality {
+    /// Keep the menu choice distinct from the QQ tier it requests. Two
+    /// different Apple Music options can be mapped to the same tier.
+    var playbackQualityChoice: MusicQuality {
         if isCellularData {
-            return settings.requestedQuality(
-                for: sessionCellularPlaybackQuality
-                    ?? settings.cellularQuality
-            )
+            return sessionCellularPlaybackQuality ?? settings.cellularQuality
         }
-        return settings.requestedQuality(
-            for: sessionPlaybackQuality ?? settings.quality
-        )
+        return sessionPlaybackQuality ?? settings.quality
+    }
+
+    var playbackQuality: MusicQuality {
+        settings.requestedQuality(for: playbackQualityChoice)
     }
 
     var hasSessionPlaybackQuality: Bool {
@@ -178,6 +179,14 @@ final class NeteaseAPI {
 
     var sourcePlaybackQualities: [MusicQuality] {
         resolver?.supportedQualities ?? []
+    }
+
+    var sourceConfigurationRevision: UInt64 {
+        resolver?.configurationRevision ?? 0
+    }
+
+    func sourceEvidence(for song: Song, quality: MusicQuality) -> LXQualityEvidence {
+        resolver?.evidence(for: song, quality: quality) ?? .untested
     }
 
     func recommendedPlaylists(limit: Int = 10) async throws -> [Playlist] {

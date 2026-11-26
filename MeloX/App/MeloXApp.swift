@@ -40,10 +40,17 @@ struct MeloXApp: App {
             hadCompletedOnboarding: settings.hasCompletedOnboarding,
             currentReleaseNotes: AppReleaseNotesLoader.load()
         )
-        let sourceStore = LXSourceStore()
-        let resolver = LXPlaybackResolver(store: sourceStore)
+        let session: URLSession
+        #if DEBUG && targetEnvironment(simulator)
+        session = FixturePlaybackSession.isEnabled ? FixturePlaybackSession.session : .shared
+        #else
+        session = .shared
+        #endif
+        let sourceStore = LXSourceStore(session: session)
+        let resolver = LXPlaybackResolver(store: sourceStore, session: session)
         let api = NeteaseAPI(
             settings: settings,
+            session: session,
             resolver: resolver
         )
         let library = LibraryStore(api: api, settings: settings)
@@ -102,7 +109,7 @@ struct MeloXApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(initialTab: settings.launchTab)
+            rootView
                 .environment(settings)
                 .environment(api)
                 .environment(sourceStore)
@@ -129,6 +136,9 @@ struct MeloXApp: App {
                     isLowPowerModeEnabled = ProcessInfo.processInfo.isLowPowerModeEnabled
                 }
                 .task {
+                    #if DEBUG && targetEnvironment(simulator)
+                    if FixturePlaybackSession.isEnabled { return }
+                    #endif
                     phoneWatchSync.start()
                     await lyricsNotifications
                         .refreshAuthorizationStatus()
@@ -141,6 +151,19 @@ struct MeloXApp: App {
                     }
                 }
         }
+    }
+
+    @ViewBuilder
+    private var rootView: some View {
+        #if DEBUG && targetEnvironment(simulator)
+        if FixturePlaybackSession.isEnabled {
+            FixturePlaybackControls()
+        } else {
+            ContentView(initialTab: settings.launchTab)
+        }
+        #else
+        ContentView(initialTab: settings.launchTab)
+        #endif
     }
 
     private var effectiveLyricsRefreshRate: LyricsRefreshRate {

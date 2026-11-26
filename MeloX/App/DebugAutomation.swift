@@ -93,7 +93,7 @@ enum MeloXDebugAutomation {
         case "source":
             // Imports a source script the way the settings screen does. The
             // host passes the address in; it is never kept in the tree.
-            guard let address = query["url"] else { break }
+            guard !FixturePlaybackSession.isEnabled, let address = query["url"] else { break }
             note = "importing"
             Task {
                 if query["only"] == "1" {
@@ -105,6 +105,7 @@ enum MeloXDebugAutomation {
                 note = sources.errorMessage ?? "imported"
             }
         case "find":
+            guard !FixturePlaybackSession.isEnabled else { break }
             // Plays a real song, found the way the search screen finds it.
             let keywords = query["q"] ?? ""
             note = "searching"
@@ -263,10 +264,11 @@ enum MeloXDebugAutomation {
     }
 
     private static func loadFixtureSizes(from address: String?) async {
+        let session = FixturePlaybackSession.isEnabled ? FixturePlaybackSession.session : URLSession.shared
         guard fixtureSizes.isEmpty,
               let address,
               let url = URL(string: address),
-              let (data, _) = try? await URLSession.shared.data(from: url),
+              let (data, _) = try? await session.data(from: url),
               let sizes = try? JSONDecoder().decode(
                 [String: Int64].self,
                 from: data
@@ -296,6 +298,7 @@ enum MeloXDebugAutomation {
         sources: LXSourceStore
     ) {
         let state: [String: Any] = [
+            "fixtureOnly": FixturePlaybackSession.isEnabled,
             "song": player.currentSong?.name ?? "",
             "artist": player.currentSong?.artistText ?? "",
             "seconds": (player.currentSong?.durationMS ?? 0) / 1_000,
@@ -313,11 +316,11 @@ enum MeloXDebugAutomation {
             "progress": (player.estimatedProgress() * 10).rounded() / 10,
             "playing": player.effectivePlaybackQuality.map { "\($0)" } ?? "",
             "requested": "\(api.playbackQuality)",
-            "offered": player.playbackQualityOptions.map { quality in
-                player.currentSongOffers(quality) == false
-                    ? "\(quality)(无)"
-                    : "\(quality)"
-            },
+            "offered": player.playbackQualityOptions.map { "\($0)" },
+            "evidence": Dictionary(uniqueKeysWithValues: MusicQuality.allCases.map { tier in
+                ("\(tier)", "\(player.currentQualityEvidence(for: tier))")
+            }),
+            "nextPreparation": player.debugNextPreparation,
             "issue": player.playbackIssue?.message ?? "",
             "notice": player.playbackQualityNotice ?? "",
             "switching": player.isSwitchingPlaybackQuality,

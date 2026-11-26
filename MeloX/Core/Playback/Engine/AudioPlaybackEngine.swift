@@ -55,6 +55,7 @@ final class AudioPlaybackEngine {
     private var pendingSeekTime: TimeInterval?
     private var didReportCurrentItemFailure = false
     private var loadGeneration = 0
+    private var isPromotingStandby = false
     #if os(macOS)
     private var spatialAudioMode: SpatialAudioMode
     #endif
@@ -101,6 +102,7 @@ final class AudioPlaybackEngine {
     func load(_ source: PlaybackSource, startAt: TimeInterval = 0, autoplay: Bool) async {
         loadGeneration += 1
         let generation = loadGeneration
+        cancelStandby()
         autoMixController.cancel(wantsPlayback: false)
         wantsPlayback = autoplay
         didReportCurrentItemFailure = false
@@ -174,9 +176,49 @@ final class AudioPlaybackEngine {
     }
     #endif
 
+    func prepareStandby(_ source: PlaybackSource, token: UUID) async -> Bool {
+        await autoMixController.prepareStandby(source, token: token)
+    }
+
+    /// On false the active item is unchanged. On true the new deck is already
+    /// active and `state` is readable, but no song/state/clock callback is made
+    /// in this call. The store must set its song and clock before yielding MainActor.
+    func promoteStandby(token: UUID, autoplay: Bool) -> Bool {
+        guard autoMixController.canPromoteStandby(token: token) else { return false }
+        isPromotingStandby = true
+        defer { isPromotingStandby = false }
+        if autoplay {
+            do { try AudioPlaybackSessionConfigurator.activate() }
+            catch { cancelStandby(); return false }
+        }
+        guard autoMixController.promoteStandby(token: token, autoplay: autoplay) else { return false }
+        loadGeneration += 1
+        wantsPlayback = autoplay
+        pendingSeekTime = nil
+        didReportCurrentItemFailure = false
+        state = activeDeck.state
+        let generation = loadGeneration
+        let itemID = activeDeck.itemID
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let isCurrent = { self.loadGeneration == generation && self.activeDeck.itemID == itemID }
+            guard isCurrent() else { return }
+            self.publishDurationIfAvailable()
+            guard isCurrent() else { return }
+            // Even playing -> playing (or paused -> paused) is a new store item.
+            self.onStateChanged?(self.state)
+            guard isCurrent() else { return }
+            self.publishPlaybackClockSample(origin: .activeItemChanged)
+        }
+        return true
+    }
+
+    func cancelStandby() { autoMixController.cancelStandby() }
+
     func prepareAutoMix(_ source: PlaybackSource, identifier: Int, plan: AutoMixTransitionPlan) async {
-        await autoMixController.prepare(source, identifier: identifier, plan: plan)
-        autoMixController.startIfNeeded(wantsPlayback: wantsPlayback)
+        if await autoMixController.prepare(source, identifier: identifier, plan: plan) {
+            autoMixController.startIfNeeded(wantsPlayback: wantsPlayback)
+        }
     }
     func cancelAutoMix() { autoMixController.cancel(wantsPlayback: wantsPlayback) }
 
@@ -187,21 +229,24 @@ final class AudioPlaybackEngine {
                 #if os(macOS)
                 if deck.isReady { AudioSpatializationPolicy.apply(self.spatialAudioMode, to: deck) }
                 #endif
-                if index == self.activeDeckIndex { self.updateStateFromPlayer() }
+                if index == self.activeDeckIndex, !self.isPromotingStandby { self.updateStateFromPlayer() }
             }
             deck.onSeekCompleted = { [weak self] in
-                guard let self, index == self.activeDeckIndex else { return }
+                guard let self, index == self.activeDeckIndex, !self.isPromotingStandby else { return }
                 self.publishPlaybackClockSample(origin: .seekCompleted)
             }
-            deck.onEnded = { [weak self] in
-                guard let self else { return }
-                if self.autoMixController.finishIfOutgoingEnded(at: index, wantsPlayback: self.wantsPlayback) { return }
-                if index == self.activeDeckIndex { self.onPlaybackEnded?() }
+            deck.onEnded = { [weak self, weak deck] in
+                guard let self, let deck else { return }
+                if index != self.activeDeckIndex {
+                    self.autoMixController.inactiveDeckFailed(at: index, itemID: deck.itemID, error: nil)
+                } else if !self.autoMixController.finishIfOutgoingEnded(at: index, wantsPlayback: self.wantsPlayback) {
+                    self.onPlaybackEnded?()
+                }
             }
-            deck.onFailure = { [weak self] error in
-                guard let self else { return }
+            deck.onFailure = { [weak self, weak deck] error in
+                guard let self, let deck else { return }
                 if index == self.activeDeckIndex { self.fail(with: AudioPlaybackError.itemFailed(error)) }
-                else { self.autoMixController.failPrepared(on: index, error: error) }
+                else { self.autoMixController.inactiveDeckFailed(at: index, itemID: deck.itemID, error: error) }
             }
         }
     }

@@ -4,6 +4,9 @@
 
 ### 简体中文
 
+- 2.1.2：播放音质按当前音源实际返回的文件判定；QQ 资料漏报某一档不会限制尝试。「未检测」不再写成「本曲暂无」，降档只影响当前歌曲。
+- 普通播放在曲尾提前约 60 秒选好并缓冲下一首。切歌复用已完成或正在进行的请求；预取失败不会提前停止当前歌曲。
+
 - 发现页推荐行按当前窗口宽度排满完整卡片，与下方网格的左右边缘对齐；长短标题歌单的封面统一按顶边排列
 
 - 参照 Apple Music 实机界面收紧侧栏顶部空间，搜索置顶，账号入口固定在侧栏底部，不随列表滚动
@@ -25,6 +28,9 @@
 - 修复了播放队列中播放模式控件吸顶切换时，歌曲列表和滚动指示条位置跳动的问题（感谢 @Fab1e2000）
 
 ### English
+
+- In 2.1.2, playback quality is checked against the file delivered by the source. A tier missing from QQ’s catalog response can still be tried. Unverified tiers are no longer labelled as absent, and falling back does not change the preference for the next song.
+- During ordinary playback, MeloX selects and buffers the next track with about 60 seconds remaining. Advancing reuses the prepared track or the ongoing request. Preparation failures do not stop the outgoing track early.
 
 - Fitted complete Discovery feature cards to the current window, aligned the shelf and grid edges, and top-aligned playlist covers despite different title lengths
 

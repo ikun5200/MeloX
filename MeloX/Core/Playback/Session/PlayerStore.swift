@@ -92,13 +92,21 @@ final class PlayerStore {
         )
     }
 
-    /// Whether the playing song has a file at `quality`. `nil` while QQ has
-    /// not said.
-    func currentSongOffers(_ quality: MusicQuality) -> Bool? {
-        currentSongAudioAvailability.supports(quality)
+    var selectedPlaybackQualityOption: MusicQuality { api.playbackQualityChoice }
+
+    var isCurrentQualityVerified: Bool { currentPlaybackSource?.qualityVerified == true }
+
+    /// This is evidence about the enabled sources, not the account's QQ catalog.
+    func currentQualityEvidence(for tier: MusicQuality) -> LXQualityEvidence {
+        guard let currentSong else { return .untested }
+        return api.sourceEvidence(for: currentSong, quality: tier)
     }
 
-    private var playbackQueue = PlaybackQueue()
+    private var playbackQueue = PlaybackQueue() {
+        didSet { queueRevision &+= 1 }
+    }
+    @ObservationIgnored private var queueRevision = 0
+    @ObservationIgnored private var transportRevision = 0
     private var consecutiveSourceFailures = 0
 
     var queue: [Song] { playbackQueue.songs }
@@ -255,7 +263,6 @@ final class PlayerStore {
     @ObservationIgnored
     private var currentStreamDuration: TimeInterval?
 
-    @ObservationIgnored
     private var currentPlaybackSource: PlaybackSource?
 
     @ObservationIgnored
@@ -281,20 +288,23 @@ final class PlayerStore {
     private var preresolvedPlaybackSource: (songID: Int, source: PlaybackSource)?
 
     @ObservationIgnored
-    private var resolvedAudioAvailability: [Int: SongAudioAvailability] = [:]
+    private var resolvedAudioAvailability: [String: SongAudioAvailability] = [:]
 
     @ObservationIgnored
-    private var audioAvailabilityFetches: [Int: Task<Void, Never>] = [:]
+    private var audioAvailabilityFetches: [String: Task<Void, Never>] = [:]
 
     @ObservationIgnored
     private var playbackIssueDismissTask: Task<Void, Never>?
 
-    /// The upcoming song whose stream was fetched before this one ended.
-    @ObservationIgnored
-    private var prefetchedNextSongID: Int?
+    @ObservationIgnored private var nextPreparation: NextPlaybackPreparation?
+    @ObservationIgnored private var adoptedResolution: Task<SelectedPlaybackSource, Error>?
+    @ObservationIgnored private var isCancellingPreparation = false
 
-    @ObservationIgnored
-    private var nextSourcePrefetchTask: Task<Void, Never>?
+    #if DEBUG
+    var debugNextPreparation: String {
+        autoMixCoordinator.debugDeckPreparation ?? nextPreparation?.phase.rawValue ?? "idle"
+    }
+    #endif
 
     @ObservationIgnored
     private var nowPlayingLyricsSongID: Int?
@@ -342,7 +352,6 @@ final class PlayerStore {
         let beatAnalyzer = AutoMixAudioAnalyzer()
         self.beatAnalyzer = beatAnalyzer
         autoMixCoordinator = AutoMixPlaybackCoordinator(
-            api: api,
             downloads: downloads,
             engine: engine,
             analyzer: beatAnalyzer
@@ -433,7 +442,7 @@ final class PlayerStore {
         isAutoplayEnabled = false
         isAutoMixEnabled = false
         isHeartModeActive = false
-        cancelAutoMixPreparation()
+        cancelNextPreparation()
         updateQueueModeIndicator()
         persistSnapshot()
     }
@@ -453,7 +462,7 @@ final class PlayerStore {
         isAutoMixEnabled = saved.autoMixEnabled
         updateQueueModeIndicator()
         persistSnapshot()
-        prepareAutoMixIfNeeded()
+        prepareNextIfNeeded()
     }
 
     func synchronizeListenTogetherPlayback(
@@ -554,7 +563,7 @@ final class PlayerStore {
     ) {
         let queueChanged = songs.map(\.id) != queue.map(\.id)
         if queueChanged {
-            cancelAutoMixPreparation()
+            cancelNextPreparation()
             playbackQueue.replace(
                 with: songs,
                 startingAt: targetIndex
@@ -660,9 +669,7 @@ final class PlayerStore {
     func togglePlayback() {
         guard currentSong != nil else { return }
         if isLoading || engine.hasCurrentItem {
-            let shouldPlay = isLoading
-                ? (!isListenTogetherSessionActive || !currentLoadShouldAutoplay)
-                : !isPlaying
+            let shouldPlay = isLoading ? !currentLoadShouldAutoplay : !isPlaying
             setLocalPlaybackIntent(shouldPlay)
         } else {
             Task { @MainActor [weak self] in
@@ -671,7 +678,12 @@ final class PlayerStore {
         }
     }
 
+    private var transportStamp: (generation: Int, index: Int, songID: Int?, seek: Int, intent: Int) {
+        (loadGeneration, currentIndex, currentSong?.id, seekRevision, transportRevision)
+    }
+
     private func setLocalPlaybackIntent(_ shouldPlay: Bool) {
+        transportRevision &+= 1
         currentLoadShouldAutoplay = shouldPlay
         if shouldPlay {
             dismissPlaybackIssue()
@@ -785,16 +797,14 @@ final class PlayerStore {
     func selectSessionPlaybackQuality(_ quality: MusicQuality) {
         // Choosing the standing tier again, for a song playing below it,
         // asks the sources once more instead of replaying their answer.
-        let isRetry = preferredPlaybackQuality == quality
-        guard !isRetry
-                || (effectivePlaybackQuality != nil
-                    && effectivePlaybackQuality != quality) else {
-            return
-        }
+        let target = settings.requestedQuality(for: quality)
+        let sameTarget = preferredPlaybackQuality == target
+        let isRetry = selectedPlaybackQualityOption == quality
         api.setSessionPlaybackQuality(
             quality,
             forCellularData: api.isCellularData
         )
+        guard !sameTarget || (isRetry && effectivePlaybackQuality != target) else { return }
         applyPreferredQualityToCurrentSong(refreshingSource: isRetry)
     }
 
@@ -857,7 +867,7 @@ final class PlayerStore {
                 showPlaybackQualityNotice(
                     L10n.format(
                         "ui.player.quality_unavailable",
-                        settings.title(for: preference)
+                        preference.title
                     )
                 )
             }
@@ -902,7 +912,7 @@ final class PlayerStore {
         if song.audioAvailability.isKnown {
             return song.audioAvailability
         }
-        return resolvedAudioAvailability[song.id] ?? .unknown
+        return resolvedAudioAvailability[song.mid] ?? .unknown
     }
 
     /// Asks QQ which encodings `song` has, for a song that came from a list
@@ -911,34 +921,33 @@ final class PlayerStore {
         guard api.isUsingSourceResolver,
               !song.mid.isEmpty,
               !knownAudioAvailability(for: song).isKnown,
-              audioAvailabilityFetches[song.id] == nil else {
+              audioAvailabilityFetches[song.mid] == nil else {
             return
         }
-        audioAvailabilityFetches[song.id] = Task { @MainActor [weak self] in
+        audioAvailabilityFetches[song.mid] = Task { @MainActor [weak self] in
             guard let api = self?.api else { return }
             let detailedSong = try? await api.songDetail(mid: song.mid)
             guard let self else { return }
-            audioAvailabilityFetches[song.id] = nil
+            audioAvailabilityFetches[song.mid] = nil
             guard let availability = detailedSong?.audioAvailability,
                   availability.isKnown else {
                 return
             }
-            resolvedAudioAvailability[song.id] = availability
-            if currentSong?.id == song.id {
+            resolvedAudioAvailability[song.mid] = availability
+            if currentSong?.mid == song.mid {
                 currentSongAudioAvailability = availability
             }
         }
     }
 
-    /// What QQ says `song` has, waiting briefly for the answer when it is
-    /// not known yet. Knowing it spares every source a request for a tier
-    /// the song lacks, and lets a returned file be told from another.
+    /// Catalog sizes can corroborate an encoding, particularly branded mixes.
+    /// Missing catalog data never excludes a tier from the source search.
     private func audioAvailabilityForResolution(
         of song: Song
     ) async -> SongAudioAvailability {
         fetchAudioAvailabilityIfNeeded(for: song)
         let deadline = ContinuousClock.now + .milliseconds(1_500)
-        while audioAvailabilityFetches[song.id] != nil,
+        while audioAvailabilityFetches[song.mid] != nil,
               ContinuousClock.now < deadline,
               !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(40))
@@ -947,25 +956,33 @@ final class PlayerStore {
     }
 
     func next() async {
+        transportRevision &+= 1
         await moveToNext(recordingCurrentPlayback: true)
     }
 
     private func moveToNext(recordingCurrentPlayback: Bool) async {
         guard !queue.isEmpty else { return }
+        let stamp = transportStamp
         if !playbackQueue.canMove(
             by: 1,
             wraps: repeatMode == .all
         ), isAutoplayEnabled {
             await appendAutoplayRecommendationsIfNeeded()
+            guard transportStamp == stamp, !Task.isCancelled else { return }
         }
         if recordingCurrentPlayback {
             recordCurrentPlayback()
         }
-        guard playbackQueue.canMove(
-            by: 1,
-            wraps: repeatMode == .all
-        ) else {
-            stopAtQueueEnd()
+        let prepared = currentNextPreparation(checkFile: true)
+        if let prepared, let selected = prepared.selected,
+           prepared.phase == .buffering || prepared.phase == .ready,
+           engine.promoteStandby(token: prepared.token, autoplay: true) {
+            // Trust the deck, not the scheduling of our ready notification.
+            if prepared.phase == .buffering {
+                rigTrace("next", "ready token=\(prepared.token) to=\(prepared.key.incomingID)")
+            }
+            // The engine swapped synchronously. Commit before its first incoming callback.
+            commitPreparedNext(prepared, selected: selected, kind: "standby", reportsToRoom: true)
             return
         }
         guard playbackQueue.move(by: 1, wraps: repeatMode == .all) else {
@@ -973,7 +990,7 @@ final class PlayerStore {
             return
         }
         hasRecordedCurrentStart = false
-        await loadCurrentSong(autoplay: true, reportsToRoom: true)
+        await loadCurrentSong(autoplay: true, reportsToRoom: true, taking: prepared)
     }
 
     func previous() async {
@@ -1001,11 +1018,11 @@ final class PlayerStore {
     }
 
     func addToPlaybackQueue(_ song: Song) {
-        cancelAutoMixPreparation()
+        cancelNextPreparation()
         playbackQueue.append(song)
         onListenTogetherQueueEdit?()
         persistSnapshot()
-        prepareAutoMixIfNeeded()
+        prepareNextIfNeeded()
     }
 
     func playNext(_ song: Song) async {
@@ -1014,18 +1031,18 @@ final class PlayerStore {
             return
         }
 
-        cancelAutoMixPreparation()
+        cancelNextPreparation()
         playbackQueue.insertNext(song)
         onListenTogetherQueueEdit?()
         persistSnapshot()
-        prepareAutoMixIfNeeded()
+        prepareNextIfNeeded()
     }
 
     func moveUpcomingQueueItems(
         fromOffsets source: IndexSet,
         toOffset destination: Int
     ) {
-        cancelAutoMixPreparation()
+        cancelNextPreparation()
         let previousIDs = listenTogetherDisplaySongIDs
         playbackQueue.moveUpcomingSongs(
             fromOffsets: source,
@@ -1036,12 +1053,12 @@ final class PlayerStore {
             onListenTogetherQueueEdit?()
         }
         persistSnapshot()
-        prepareAutoMixIfNeeded()
+        prepareNextIfNeeded()
     }
 
     func seek(to seconds: TimeInterval, reportsToRoom: Bool = true) {
         let clamped = clampedPlaybackPosition(seconds)
-        cancelAutoMixPreparation()
+        cancelNextPreparation()
         progress = clamped
         reanchorPlaybackTimeline(to: clamped, rate: 0)
         seekRevision += 1
@@ -1182,11 +1199,11 @@ final class PlayerStore {
     }
 
     func clearPlaybackAnalysisCache() async {
-        cancelAutoMixPreparation()
+        cancelNextPreparation()
         resetBeatAnalysis()
         await beatAnalyzer.clearCache()
         scheduleBeatAnalysisIfNeeded()
-        prepareAutoMixIfNeeded()
+        prepareNextIfNeeded()
     }
 
     @discardableResult
@@ -1325,7 +1342,7 @@ final class PlayerStore {
         if isListenTogetherSessionActive {
             listenTogetherPlayModeTouched = true
         }
-        cancelAutoMixPreparation()
+        cancelNextPreparation()
         switch repeatMode {
         case .off:
             repeatMode = .all
@@ -1344,7 +1361,7 @@ final class PlayerStore {
         if isListenTogetherSessionActive {
             listenTogetherPlayModeTouched = true
         }
-        cancelAutoMixPreparation()
+        cancelNextPreparation()
         playbackQueue.toggleShuffle()
         if isShuffled {
             queueModeIndicator = .shuffle
@@ -1383,11 +1400,11 @@ final class PlayerStore {
             queueModeIndicator = .autoMix
         } else {
             updateQueueModeIndicator()
-            cancelAutoMixPreparation()
+            cancelNextPreparation()
         }
         persistSnapshot()
         if isEnabled {
-            prepareAutoMixIfNeeded()
+            prepareNextIfNeeded()
         }
     }
 
@@ -1401,7 +1418,7 @@ final class PlayerStore {
                     autoMixEnabled: false
                 )
             isAutoMixEnabled = false
-            cancelAutoMixPreparation()
+            cancelNextPreparation()
             persistSnapshot()
             return
         }
@@ -1410,28 +1427,34 @@ final class PlayerStore {
     }
 
     func applyAutoMixSettings() {
-        cancelAutoMixPreparation()
+        cancelNextPreparation()
         persistSnapshot()
         guard isAutoMixEnabled else { return }
-        prepareAutoMixIfNeeded()
+        prepareNextIfNeeded()
     }
 
     private func loadCurrentSong(
         autoplay: Bool,
         startAt: TimeInterval = 0,
         reportsToRoom: Bool = false,
-        queueChanged: Bool = false
+        queueChanged: Bool = false,
+        taking prepared: NextPlaybackPreparation? = nil
     ) async {
         guard let song = playbackQueue.currentSong else { return }
         rigTrace("player", "load \(song.name) startAt=\(startAt) autoplay=\(autoplay)")
         let formerSongID = currentSong?.id
-        if song.id != formerSongID {
+        if song.id != formerSongID || reportsToRoom {
             playbackRecoveryAttempts = 0
-            cancelPlaybackQualitySwitch()
         }
-        cancelAutoMixPreparation()
+        cancelPlaybackQualitySwitch()
+        adoptedResolution?.cancel()
+        adoptedResolution = prepared?.resolution
+        cancelNextPreparation(keepingResolution: prepared)
         loadGeneration += 1
         let generation = loadGeneration
+        defer {
+            if generation == loadGeneration { adoptedResolution = nil }
+        }
         // Publish play intent before unload and before `currentSong` changes.
         // Listen-together observes both, and the new item is not playing yet.
         currentLoadShouldAutoplay = autoplay
@@ -1484,13 +1507,14 @@ final class PlayerStore {
         }
 
         do {
-            let source = try await playbackSourceRetryingTransientFailure(
-                for: song,
-                cachedDetailedSong: cachedDetailedSong,
-                generation: generation
+            let selected = try await playbackSourceRetryingTransientFailure(
+                for: song, cachedDetailedSong: cachedDetailedSong,
+                generation: generation, taking: prepared
             )
             guard generation == loadGeneration, currentSong?.id == song.id else { return }
+            let source = selected.source
             isResolvingSource = false
+            isUsingDownloadedSource = selected.isDownloaded
             currentPlaybackSource = source
             effectivePlaybackQuality = source.quality
             let shouldAutoplay = currentLoadShouldAutoplay
@@ -1502,10 +1526,13 @@ final class PlayerStore {
                 autoplay: shouldAutoplay
             )
         } catch is CancellationError {
-            return
+            guard generation == loadGeneration else { return }
+            isResolvingSource = false
+            isLoading = false
+            updateNowPlayingState()
         } catch {
             guard generation == loadGeneration, currentSong?.id == song.id else { return }
-            rigTrace("player", "load failed: \(error)")
+            rigTrace("player", "load failed id=\(song.id)")
             isResolvingSource = false
             isLoading = false
             isPlaying = false
@@ -1527,11 +1554,10 @@ final class PlayerStore {
             guard consecutiveSourceFailures < max(queue.count, 1) else {
                 return
             }
+            let failedAt = transportStamp
             try? await Task.sleep(for: .milliseconds(900))
-            guard generation == loadGeneration,
-                  currentSong?.id == song.id else {
-                return
-            }
+            guard !Task.isCancelled, transportStamp == failedAt,
+                  currentLoadShouldAutoplay else { return }
             await moveToNext(recordingCurrentPlayback: false)
         }
     }
@@ -1542,95 +1568,93 @@ final class PlayerStore {
     private func playbackSourceRetryingTransientFailure(
         for song: Song,
         cachedDetailedSong: Song?,
-        generation: Int
-    ) async throws -> PlaybackSource {
-        let attempts = 3
-        var lastError: Error?
-        for attempt in 0..<attempts {
-            if attempt > 0 {
+        generation: Int,
+        taking prepared: NextPlaybackPreparation?
+    ) async throws -> SelectedPlaybackSource {
+        var borrowed = prepared
+        var qualitySwitch = preresolvedPlaybackSource
+        preresolvedPlaybackSource = nil
+        var attempt = 0
+        while true {
+            try Task.checkCancellation()
+            guard generation == loadGeneration else { throw CancellationError() }
+            let policy = selectionPolicy(for: song)
+            do {
+                let selected: SelectedPlaybackSource
+                var consumed: NextPlaybackPreparation?
+                if let prepared = borrowed, prepared.key.policy == policy {
+                    borrowed = nil
+                    selected = try await prepared.resolution.value
+                    consumed = prepared
+                } else if let change = qualitySwitch, change.songID == song.id {
+                    qualitySwitch = nil
+                    selected = SelectedPlaybackSource(source: change.source, isDownloaded: false)
+                } else {
+                    borrowed?.resolution.cancel()
+                    borrowed = nil
+                    selected = try await selectPlaybackSource(for: song, policy: policy, cachedDetailedSong: cachedDetailedSong)
+                }
+                try Task.checkCancellation()
+                guard generation == loadGeneration else { throw CancellationError() }
+                guard policy == selectionPolicy(for: song) else { continue }
+                if let consumed {
+                    guard canReuse(selected, for: song, policy: policy) else { continue }
+                    rigTrace("next", "handoff kind=source token=\(consumed.token) from=\(consumed.key.outgoingID) to=\(song.id)")
+                }
+                return selected
+            } catch {
+                try Task.checkCancellation()
+                guard generation == loadGeneration else { throw CancellationError() }
+                // A revision can cancel the resolver itself. Retry the *new* policy.
+                guard policy == selectionPolicy(for: song) else { continue }
+                attempt += 1
+                guard attempt < 3, Self.isRetryablePlaybackSourceError(error) else { throw error }
                 try await Task.sleep(for: .milliseconds(400 * attempt))
             }
-            guard generation == loadGeneration, currentSong?.id == song.id else {
-                throw CancellationError()
-            }
-            do {
-                let preresolved = preresolvedPlaybackSource
-                preresolvedPlaybackSource = nil
-                if let preresolved, preresolved.songID == song.id {
-                    isUsingDownloadedSource = false
-                    return preresolved.source
-                }
-                let downloadedSource = downloads.localPlaybackSource(
-                    songID: song.id
-                )
-                if let downloadedSource,
-                   !prefersStreaming(over: downloadedSource, for: song) {
-                    isUsingDownloadedSource = true
-                    return downloadedSource
-                }
-                isUsingDownloadedSource = false
-                if !api.isUsingSourceResolver,
-                   let cachedDetailedSong {
-                    return try await api.playbackSource(for: cachedDetailedSong)
-                }
-                if !song.mid.isEmpty {
-                    guard let downloadedSource else {
-                        return try await api.playbackSource(
-                            for: song,
-                            availability: await audioAvailabilityForResolution(
-                                of: song
-                            )
-                        )
-                    }
-                    return await streamedSource(
-                        for: song,
-                        fallingBackTo: downloadedSource
-                    )
-                }
-                return try await api.playbackSource(id: song.id)
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch {
-                lastError = error
-                guard Self.isRetryablePlaybackSourceError(error) else {
-                    throw error
-                }
-            }
         }
-        throw lastError ?? APIError.noPlayableSource
     }
 
-    /// A saved file normally wins. Once the listener picks a quality in the
-    /// player for this session, a file saved at another quality would make
-    /// that choice do nothing, so the stream is tried first.
-    private func prefersStreaming(
-        over downloadedSource: PlaybackSource,
-        for song: Song
-    ) -> Bool {
-        api.isUsingSourceResolver
-            && !song.mid.isEmpty
-            && api.hasSessionPlaybackQuality
-            && downloadedSource.quality != api.playbackQuality
-    }
-
-    private func streamedSource(
-        for song: Song,
-        fallingBackTo downloadedSource: PlaybackSource
-    ) async -> PlaybackSource {
-        let streamed = try? await api.playbackSource(
-            for: song,
-            availability: await audioAvailabilityForResolution(of: song)
+    private func selectionPolicy(for song: Song) -> PlaybackSelectionPolicy {
+        PlaybackSelectionPolicy(
+            quality: api.playbackQuality, hasSessionQuality: api.hasSessionPlaybackQuality,
+            isCellular: api.isCellularData, isOnline: api.isNetworkAvailable,
+            sourceRevision: api.sourceConfigurationRevision,
+            downloadedAt: downloads.downloads.first { $0.id == song.id }?.downloadedAt
         )
-        // No stream, or one that had to downgrade to no better than the
-        // saved file, is no reason to leave the file.
-        guard let streamed,
-              streamed.quality == api.playbackQuality
-                || LXQualityMapping.rank(of: streamed.quality)
-                    > LXQualityMapping.rank(of: downloadedSource.quality) else {
-            isUsingDownloadedSource = true
-            return downloadedSource
+    }
+
+    /// Pure with respect to active playback. Foreground, ordinary standby and AutoMix
+    /// use the same download priority and the tier actually returned by the resolver.
+    private func selectPlaybackSource(
+        for song: Song, policy: PlaybackSelectionPolicy, cachedDetailedSong: Song?
+    ) async throws -> SelectedPlaybackSource {
+        try Task.checkCancellation()
+        let local = downloads.localPlaybackSource(songID: song.id)
+        if let local, !api.isUsingSourceResolver || song.mid.isEmpty || !policy.hasSessionQuality || local.quality == policy.quality {
+            return SelectedPlaybackSource(source: local, isDownloaded: true)
         }
-        return streamed
+        do {
+            let stream: PlaybackSource
+            if !api.isUsingSourceResolver, let cachedDetailedSong {
+                stream = try await api.playbackSource(for: cachedDetailedSong)
+            } else if !song.mid.isEmpty {
+                let availability = await audioAvailabilityForResolution(of: song)
+                try Task.checkCancellation()
+                stream = try await api.playbackSource(for: song, quality: policy.quality, availability: availability)
+            } else {
+                stream = try await api.playbackSource(id: song.id)
+            }
+            try Task.checkCancellation()
+            if let local, stream.quality != policy.quality,
+               LXQualityMapping.rank(of: stream.quality) <= LXQualityMapping.rank(of: local.quality) {
+                return SelectedPlaybackSource(source: local, isDownloaded: true)
+            }
+            return SelectedPlaybackSource(source: stream, isDownloaded: false)
+        } catch {
+            try Task.checkCancellation()
+            guard !(error is CancellationError), let local else { throw error }
+            return SelectedPlaybackSource(source: local, isDownloaded: true)
+        }
     }
 
     private static func isRetryablePlaybackSourceError(_ error: Error) -> Bool {
@@ -1651,9 +1675,10 @@ final class PlayerStore {
     }
 
     private func handlePlaybackEnded() async {
-        if await recoverFromTruncatedStream() {
-            return
-        }
+        let stamp = transportStamp
+        if await recoverFromTruncatedStream() { return }
+        guard transportStamp == stamp, currentLoadShouldAutoplay, engine.expectsPlaybackToContinue else { return }
+        rigTrace("next", "eof from=\(stamp.songID ?? 0)")
         recordCurrentPlayback(completed: true)
         if repeatMode == .one {
             hasRecordedCurrentStart = false
@@ -1775,7 +1800,7 @@ final class PlayerStore {
     }
 
     private func stopAtQueueEnd() {
-        cancelAutoMixPreparation()
+        cancelNextPreparation()
         engine.pause()
         engine.seek(to: 0)
         progress = 0
@@ -1825,7 +1850,7 @@ final class PlayerStore {
                 self.clearPlaybackIssue(forSongID: self.currentSong?.id)
                 self.recordCurrentPlaybackStartIfNeeded()
                 self.scheduleBeatAnalysisIfNeeded()
-                self.prepareAutoMixIfNeeded()
+                self.prepareNextIfNeeded()
             }
             self.updateNowPlayingState()
         }
@@ -1840,13 +1865,20 @@ final class PlayerStore {
             self.updateNowPlayingState()
         }
         engine.onPlaybackEnded = { [weak self] in
+            guard let self else { return }
+            let stamp = self.transportStamp
             Task { @MainActor in
-                await self?.handlePlaybackEnded()
+                guard self.transportStamp == stamp, self.currentLoadShouldAutoplay,
+                      self.engine.expectsPlaybackToContinue else { return }
+                await self.handlePlaybackEnded()
             }
         }
         engine.onFailure = { [weak self] error in
+            guard let self else { return }
+            let stamp = self.transportStamp
             Task { @MainActor in
-                await self?.handleEngineFailure(error)
+                guard self.transportStamp == stamp else { return }
+                await self.handleEngineFailure(error)
             }
         }
         engine.onInterruptionBegan = { [weak self] event in
@@ -1911,45 +1943,84 @@ final class PlayerStore {
         if second != lastPersistedSecond {
             lastPersistedSecond = second
             persistence.saveProgress(measuredProgress)
-            prefetchNextSourceIfNeeded()
+            prepareNextIfNeeded()
+        } else if isAutoMixEnabled {
+            prepareNextIfNeeded()
         }
-        prepareAutoMixIfNeeded()
     }
 
-    /// Fetches the next song's stream shortly before this one ends. Finding
-    /// one can mean asking several sources for several tiers; done ahead,
-    /// that wait is not a silence between two songs.
-    private func prefetchNextSourceIfNeeded() {
-        guard api.isUsingSourceResolver,
-              isPlaying,
-              repeatMode != .one,
-              playbackDurationLimit - progress <= 30,
-              let nextIndex = upcomingQueueIndices.first,
-              queue.indices.contains(nextIndex) else {
-            return
+    /// Indices name occurrences (including duplicate IDs) within one queue revision.
+    /// Check external inputs again at the actual handoff, not only on clock ticks.
+    private func currentNextPreparation(checkFile: Bool = false) -> NextPlaybackPreparation? {
+        guard let prepared = nextPreparation else { return nil }
+        let key = prepared.key
+        guard key.loadGeneration == loadGeneration, key.queueRevision == queueRevision,
+              key.outgoingIndex == currentIndex, key.outgoingID == currentSong?.id,
+              queue.indices.contains(key.incomingIndex), queue[key.incomingIndex].id == key.incomingID,
+              key.repeatMode == repeatMode, key.autoMixEnabled == isAutoMixEnabled,
+              prepared.isFresh else { return nil }
+        let song = queue[key.incomingIndex]
+        if let selected = prepared.selected, !canReuse(selected, for: song, policy: key.policy) { return nil }
+        if checkFile, key.policy.downloadedAt != nil,
+           downloads.localPlaybackSource(songID: song.id) == nil { return nil }
+        return key.policy == selectionPolicy(for: song) ? prepared : nil
+    }
+
+    private func canReuse(_ selected: SelectedPlaybackSource, for song: Song, policy: PlaybackSelectionPolicy) -> Bool {
+        guard selected.isFresh else { return false }
+        let source = selected.source
+        guard let revision = source.configurationRevision else { return true }
+        guard revision == policy.sourceRevision else { return false }
+        // A cached verified result may already have been old when we borrowed it.
+        guard source.qualityVerified, let tier = source.quality else { return true }
+        return api.sourceEvidence(for: song, quality: tier) == .verified
+    }
+
+    private func startNextPreparation(
+        outgoing: Song, incoming: Song, at index: Int, usesAutoMix: Bool
+    ) {
+        let policy = selectionPolicy(for: incoming)
+        let key = NextPlaybackPreparation.Key(
+            loadGeneration: loadGeneration, queueRevision: queueRevision,
+            outgoingIndex: currentIndex, outgoingID: outgoing.id,
+            incomingIndex: index, incomingID: incoming.id,
+            repeatMode: repeatMode, autoMixEnabled: isAutoMixEnabled, policy: policy
+        )
+        let resolution = Task { @MainActor in
+            try await selectPlaybackSource(for: incoming, policy: policy, cachedDetailedSong: detailedPlaybackSongs[incoming.id])
         }
-        let nextSong = queue[nextIndex]
-        guard prefetchedNextSongID != nextSong.id,
-              !nextSong.mid.isEmpty,
-              downloads.localPlaybackSource(songID: nextSong.id) == nil else {
-            return
-        }
-        prefetchedNextSongID = nextSong.id
-        nextSourcePrefetchTask?.cancel()
-        nextSourcePrefetchTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            let availability = await audioAvailabilityForResolution(
-                of: nextSong
-            )
-            guard !Task.isCancelled else { return }
-            _ = try? await api.playbackSource(
-                for: nextSong,
-                availability: availability
-            )
+        let prepared = NextPlaybackPreparation(key: key, resolution: resolution)
+        nextPreparation = prepared
+        rigTrace("next", "prepare token=\(prepared.token) from=\(outgoing.id) to=\(incoming.id)")
+        prepared.warmingTask = Task { @MainActor [weak self, weak prepared] in
+            guard let self, let prepared else { return }
+            defer { prepared.warmingTask = nil }
+            do {
+                let selected = try await resolution.value
+                guard !Task.isCancelled, currentNextPreparation(checkFile: true) === prepared else { return }
+                prepared.selected = selected
+                prepared.phase = .resolved
+                if usesAutoMix {
+                    prepareNextIfNeeded()
+                    return
+                }
+                prepared.phase = .buffering
+                let ready = await engine.prepareStandby(selected.source, token: prepared.token)
+                guard !Task.isCancelled, currentNextPreparation(checkFile: true) === prepared else { return }
+                // An unsuccessful warm-up does not invalidate a good source or skip a song.
+                prepared.phase = ready ? .ready : .resolved
+                if ready { rigTrace("next", "ready token=\(prepared.token) to=\(incoming.id)") }
+            } catch {
+                guard !Task.isCancelled, nextPreparation === prepared else { return }
+                prepared.phase = .failed
+            }
         }
     }
 
     private func bindAutoMixCoordinator() {
+        autoMixCoordinator.isCurrentPreparation = { [weak self] token in
+            self?.currentNextPreparation(checkFile: true)?.token == token
+        }
         autoMixCoordinator.onTransitionBegan = {
             [weak self] context, plan in
             guard let self,
@@ -2293,6 +2364,7 @@ final class PlayerStore {
     private func recordCurrentPlaybackStartIfNeeded() {
         guard !hasRecordedCurrentStart, let currentSong else { return }
         hasRecordedCurrentStart = true
+        rigTrace("next", "playing id=\(currentSong.id)")
         guard !currentSong.isPodcastProgram else { return }
         historyRecorder.recordRecentPlayback(
             song: currentSong,
@@ -2373,6 +2445,8 @@ final class PlayerStore {
             return
         }
 
+        let generation = loadGeneration
+        let revision = queueRevision
         isLoadingAutoplayRecommendations = true
         defer { isLoadingAutoplayRecommendations = false }
 
@@ -2380,7 +2454,8 @@ final class PlayerStore {
             let recommendations = try await api.similarSongs(
                 song: currentSong
             )
-            guard isAutoplayEnabled else { return }
+            guard !Task.isCancelled, isAutoplayEnabled,
+                  loadGeneration == generation, queueRevision == revision else { return }
             let existingSongIDs = Set(queue.map(\.id))
             let newSongs = recommendations.filter {
                 !existingSongIDs.contains($0.id)
@@ -2396,74 +2471,102 @@ final class PlayerStore {
         }
     }
 
-    private func prepareAutoMixIfNeeded() {
-        let nextSong = upcomingQueueIndices.first.flatMap {
-            queue.indices.contains($0)
-                ? queue[$0]
-                : nil
+    private func prepareNextIfNeeded() {
+        guard !isCancellingPreparation, !isResolvingSource,
+              isPlaying, currentLoadShouldAutoplay, !isHoldingPlaybackStateForSeek,
+              let outgoing = currentSong, let source = currentPlaybackSource else { return }
+        let existing = currentNextPreparation()
+        if existing == nil, nextPreparation != nil { cancelNextPreparation() }
+        guard repeatMode != .one else { return }
+        let remaining = playbackDurationLimit - estimatedProgress()
+        // Ordinary ticks do not need to enumerate a long queue outside the window.
+        if !isAutoMixEnabled, existing != nil || playbackDurationLimit <= 0 || remaining > 60 { return }
+        guard let index = existing?.key.incomingIndex ?? upcomingQueueIndices.first else { return }
+        let incoming = queue[index]
+        let usesAutoMix = isAutoMixEnabled && !outgoing.isPodcastProgram && !incoming.isPodcastProgram
+        let configuration = settings.autoMix.configuration
+        if usesAutoMix {
+            let mixRemaining = max(duration, TimeInterval(outgoing.durationMS) / 1_000) - estimatedProgress()
+            guard configuration.mode == .smart || mixRemaining <= configuration.preloadLeadTime else { return }
+        } else if playbackDurationLimit <= 0 || remaining > 60 { return }
+
+        guard let prepared = existing else {
+            startNextPreparation(outgoing: outgoing, incoming: incoming, at: index, usesAutoMix: usesAutoMix)
+            return
         }
-        autoMixCoordinator.prepareIfNeeded(
-            isEnabled:
-                isAutoMixEnabled
-                && currentSong?.isPodcastProgram != true
-                && nextSong?.isPodcastProgram != true,
-            isPlaying: isPlaying,
-            repeatsCurrentSong: repeatMode == .one,
-            outgoingSong: currentSong,
-            outgoingSource: currentPlaybackSource,
-            outgoingSourceIsDownloaded:
-                isUsingDownloadedSource,
-            outgoingDuration: duration,
-            outgoingProgress: estimatedProgress(),
-            incomingSong: nextSong,
-            configuration: settings.autoMix.configuration
-        )
+        if usesAutoMix, let selected = prepared.selected {
+            autoMixCoordinator.prepareIfNeeded(
+                token: prepared.token, outgoingSong: outgoing, outgoingSource: source,
+                outgoingSourceIsDownloaded: isUsingDownloadedSource, outgoingDuration: duration,
+                outgoingProgress: estimatedProgress(), incomingSong: incoming,
+                incomingSource: selected, configuration: configuration
+            )
+        }
     }
 
-    private func cancelAutoMixPreparation() {
+    private func cancelNextPreparation(keepingResolution keeper: NextPlaybackPreparation? = nil) {
+        isCancellingPreparation = true
+        defer { isCancellingPreparation = false }
+        if let prepared = nextPreparation {
+            nextPreparation = nil
+            prepared.warmingTask?.cancel()
+            if prepared !== keeper { prepared.resolution.cancel() }
+            if prepared.phase == .buffering || prepared.phase == .ready { engine.cancelStandby() }
+        }
         autoMixTransitionProgress = nil
         autoMixTransitionKind = nil
         autoMixIncomingSongName = nil
         autoMixCoordinator.cancel()
     }
 
-    private func completeAutoMixTransition(
-        context: PreparedAutoMixContext
-    ) {
-        guard context.outgoingSongID == currentSong?.id else {
-            cancelAutoMixPreparation()
-            return
-        }
-
+    private func completeAutoMixTransition(context: PreparedAutoMixContext) {
+        guard let prepared = nextPreparation, context.token == prepared.token else { return }
         recordCurrentPlayback(completed: true)
-        guard playbackQueue.move(
-            by: 1,
-            wraps: repeatMode == .all
-        ),
-              playbackQueue.currentSong?.id
-                == context.incomingSong.id else {
-            cancelAutoMixPreparation()
-            return
+        if currentNextPreparation(checkFile: true) === prepared, let selected = prepared.selected {
+            commitPreparedNext(prepared, selected: selected, kind: "automix", reportsToRoom: false)
+        } else {
+            // The controller has already switched decks. A policy change in the last
+            // fade frame must not leave stale audio playing under the outgoing title.
+            let stamp = transportStamp
+            cancelNextPreparation()
+            engine.unload()
+            Task { @MainActor in
+                guard transportStamp == stamp, currentLoadShouldAutoplay else { return }
+                await moveToNext(recordingCurrentPlayback: false)
+            }
         }
+    }
 
+    /// Both kinds of deck handoff arrive here after the engine swap, with no await.
+    private func commitPreparedNext(
+        _ prepared: NextPlaybackPreparation, selected: SelectedPlaybackSource,
+        kind: String, reportsToRoom: Bool
+    ) {
+        let key = prepared.key
+        nextPreparation = nil
+        _ = playbackQueue.select(index: key.incomingIndex)
+        let song = queue[key.incomingIndex]
+        rigTrace("next", "handoff kind=\(kind) token=\(prepared.token) from=\(key.outgoingID) to=\(song.id)")
         loadGeneration += 1
-        let generation = loadGeneration
-        currentSong = context.incomingSong
-        resolveCurrentSongAudioAvailability(
-            for: context.incomingSong,
-            generation: generation
-        )
+        cancelPlaybackQualitySwitch()
+        endSeekPlaybackStateHold()
+        currentSong = song
+        resolveCurrentSongAudioAvailability(for: song, generation: loadGeneration)
         resetBeatAnalysis()
-        currentPlaybackSource = context.source
-        effectivePlaybackQuality = context.source.quality
-        isUsingDownloadedSource =
-            context.sourceIsDownloaded
-        currentLoadShouldAutoplay = true
-        currentStreamHasPlayed = true
-        currentStreamDuration = nil
+        currentPlaybackSource = selected.source
+        effectivePlaybackQuality = selected.source.quality
+        isUsingDownloadedSource = selected.isDownloaded
+        currentLoadShouldAutoplay = engine.expectsPlaybackToContinue
         isResolvingSource = false
-        isLoading = engine.state == .loading
         isPlaying = engine.state == .playing
+        isLoading = engine.state == .loading
+        currentStreamHasPlayed = isPlaying
+        currentStreamDuration = nil
+        playbackRecoveryAttempts = 0
+        consecutiveSourceFailures = 0
+        duration = TimeInterval(song.durationMS) / 1_000
+        progress = clampedPlaybackPosition(engine.currentPlaybackTime ?? 0)
+        reanchorPlaybackTimeline(to: progress, rate: isPlaying ? 1 : 0)
         dismissPlaybackIssue()
         hasRecordedCurrentStart = false
         lastPersistedSecond = Int(progress)
@@ -2471,29 +2574,19 @@ final class PlayerStore {
         nowPlayingLyrics = []
         publishedNowPlayingLyricID = nil
         publishedLyricsLiveActivity = nil
-
         autoMixTransitionProgress = nil
         autoMixTransitionKind = nil
         autoMixIncomingSongName = nil
-
         nowPlayingSession.setSong(
-            context.incomingSong,
-            duration: duration,
-            queueIndex: currentIndex,
-            queueCount: queue.count,
-            lyricsDisplaySettings:
-                nowPlayingLyricsDisplaySettings
+            song, duration: duration, queueIndex: currentIndex, queueCount: queue.count,
+            lyricsDisplaySettings: nowPlayingLyricsDisplaySettings
         )
-        if isPlaying {
-            recordCurrentPlaybackStartIfNeeded()
-        }
-        updateNowPlayingState(
-            forceNowPlayingLyrics: true,
-            forceLyricsLiveActivity: true
-        )
+        if isPlaying { recordCurrentPlaybackStartIfNeeded() }
+        updateNowPlayingState(forceNowPlayingLyrics: true, forceLyricsLiveActivity: true)
         persistSnapshot()
+        if reportsToRoom { onListenTogetherTransport?(.goTo, key.outgoingID) }
         scheduleBeatAnalysisIfNeeded()
-        prepareAutoMixIfNeeded()
+        prepareNextIfNeeded()
     }
 
     private func resolveCurrentSongAudioAvailability(

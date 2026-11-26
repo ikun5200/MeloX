@@ -14,6 +14,7 @@ final class AudioPlaybackDeck: NSObject, @preconcurrency AudioPlayerDelegate {
     private(set) var error: Error?
     private(set) var channelCount: AVAudioChannelCount = 2
     private var player: AudioStreaming.AudioPlayer?
+    private var formatTask: Task<Void, Never>?
     private var loadContinuation: CheckedContinuation<Bool, Never>?
     private var source: PlaybackSource?
     private var finishedPosition: TimeInterval?
@@ -36,6 +37,11 @@ final class AudioPlaybackDeck: NSObject, @preconcurrency AudioPlayerDelegate {
 
     var hasCurrentItem: Bool { itemID != nil }
     var isReady: Bool { state == .playing || state == .paused }
+    /// Unlike `isReady`, excludes an ended/failed item and a pause during loading.
+    var isPrerolled: Bool {
+        state == .paused && player?.state == .paused && currentEntryID != nil
+            && !isSeeking && initialSeek == nil && finishedPosition == nil && error == nil
+    }
     var currentPlaybackTime: TimeInterval? {
         guard let player, !isSeeking, initialSeek == nil else { return nil }
         return finishedPosition ?? max(player.progress, 0)
@@ -63,10 +69,10 @@ final class AudioPlaybackDeck: NSObject, @preconcurrency AudioPlayerDelegate {
         }
     }
 
-    func load(_ source: PlaybackSource, identifier: Int? = nil,
-              startAt: TimeInterval = 0, autoplay: Bool = false) async -> Bool {
+    func load(_ source: PlaybackSource, itemID id: UUID = UUID(), identifier: Int? = nil,
+              startAt: TimeInterval = 0, autoplay: Bool = false, timeout: Duration? = nil) async -> Bool {
+        guard !Task.isCancelled else { return false }
         clear()
-        let id = UUID()
         itemID = id
         itemIdentifier = identifier
         self.source = source
@@ -74,11 +80,42 @@ final class AudioPlaybackDeck: NSObject, @preconcurrency AudioPlayerDelegate {
         initialSeek = max(startAt, 0)
         isSeeking = true
         transition(to: .loading)
-        let format = await AudioPlaybackFormat.load(
-            from: source.url,
-            headers: source.headers
-        )
-        guard itemID == id, !Task.isCancelled else { return false }
+
+        // Own the wait from before the format probe through the first decoded seek.
+        // clear() must release it even if the asset probe or the decoder never replies.
+        let deadline = timeout.map { timeout in
+            Task { @MainActor [weak self] in
+                do { try await Task.sleep(for: timeout) } catch { return }
+                self?.cancelLoad(id: id)
+            }
+        }
+        defer { deadline?.cancel() }
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                guard itemID == id, !Task.isCancelled else {
+                    if itemID == id { clear() }
+                    continuation.resume(returning: false)
+                    return
+                }
+                loadContinuation = continuation
+                formatTask = Task { @MainActor [weak self] in
+                    let format = await AudioPlaybackFormat.load(from: source.url, headers: source.headers)
+                    guard let self, self.itemID == id, !Task.isCancelled else { return }
+                    self.formatTask = nil
+                    self.startDecoder(source, format: format)
+                }
+            }
+        } onCancel: { [weak self] in
+            Task { @MainActor in self?.cancelLoad(id: id) }
+        }
+    }
+
+    private func cancelLoad(id: UUID) {
+        guard itemID == id, loadContinuation != nil else { return }
+        clear()
+    }
+
+    private func startDecoder(_ source: PlaybackSource, format: AVAudioFormat?) {
         let player = AudioStreaming.AudioPlayer(
             configuration: AudioPlayerConfiguration(
                 bufferSizeInSeconds: max(source.preferredForwardBufferDuration, 8),
@@ -95,10 +132,7 @@ final class AudioPlaybackDeck: NSObject, @preconcurrency AudioPlayerDelegate {
             analyzer.process(buffer: buffer)
         }
         #endif
-        return await withCheckedContinuation { continuation in
-            loadContinuation = continuation
-            player.play(url: source.url, headers: source.headers)
-        }
+        player.play(url: source.url, headers: source.headers)
     }
 
     func play() {
@@ -167,9 +201,16 @@ final class AudioPlaybackDeck: NSObject, @preconcurrency AudioPlayerDelegate {
         playbackRate = 1
         error = nil
         resetAutoMixEqualizer()
-        loadContinuation?.resume(returning: false)
-        loadContinuation = nil
+        formatTask?.cancel()
+        formatTask = nil
+        completeLoad(false)
         transition(to: .idle)
+    }
+
+    private func completeLoad(_ ready: Bool) {
+        let continuation = loadContinuation
+        loadContinuation = nil
+        continuation?.resume(returning: ready)
     }
 
     private func transition(to newState: AudioPlaybackState) {
@@ -188,18 +229,19 @@ final class AudioPlaybackDeck: NSObject, @preconcurrency AudioPlayerDelegate {
 
     func audioPlayerStateChanged(player: AudioStreaming.AudioPlayer,
                                  with newState: AudioPlayerState, previous: AudioPlayerState) {
-        guard player === self.player else { return }
+        // The vendor posts delegate events to the main queue. A buffering or
+        // paused event from preroll can arrive after this same player resumed.
+        guard player === self.player, player.state == newState else { return }
         switch newState {
         case .playing:
-            guard initialSeek == nil, !player.isSeeking, player.state == .playing else { return }
+            guard initialSeek == nil, !player.isSeeking, finishedPosition == nil, error == nil else { return }
             let completedSeek = isSeeking
             isSeeking = false
             if !wantsPlayback { player.pause() }
             player.volume = outputVolume
+            completeLoad(true)
             transition(to: wantsPlayback ? .playing : .paused)
-            loadContinuation?.resume(returning: true)
-            loadContinuation = nil
-            if completedSeek { onSeekCompleted?() }
+            if completedSeek, player === self.player, !isSeeking { onSeekCompleted?() }
         case .bufferring, .running:
             transition(to: .loading)
         case .paused:
@@ -211,24 +253,23 @@ final class AudioPlaybackDeck: NSObject, @preconcurrency AudioPlayerDelegate {
 
     func audioPlayerDidFinishPlaying(player: AudioStreaming.AudioPlayer, entryId: AudioEntryId,
                                      stopReason: AudioPlayerStopReason, progress: Double, duration: Double) {
-        guard player === self.player, currentEntryID == entryId, stopReason == .eof else { return }
+        guard player === self.player, currentEntryID == entryId, stopReason == .eof,
+              finishedPosition == nil, error == nil else { return }
         finishedPosition = progress
         isSeeking = false
         wantsPlayback = false
-        loadContinuation?.resume(returning: false)
-        loadContinuation = nil
+        completeLoad(false)
         transition(to: .paused)
-        onEnded?()
+        if player === self.player, finishedPosition != nil { onEnded?() }
     }
     func audioPlayerUnexpectedError(player: AudioStreaming.AudioPlayer, error: AudioPlayerError) {
-        guard player === self.player else { return }
+        guard player === self.player, self.error == nil, finishedPosition == nil else { return }
         self.error = error
         isSeeking = false
         wantsPlayback = false
+        completeLoad(false)
         transition(to: .paused)
-        loadContinuation?.resume(returning: false)
-        loadContinuation = nil
-        onFailure?(error)
+        if player === self.player { onFailure?(error) }
     }
     func audioPlayerDidFinishBuffering(player: AudioStreaming.AudioPlayer, with entryId: AudioEntryId) {}
     func audioPlayerDidCancel(player: AudioStreaming.AudioPlayer, queuedItems: [AudioEntryId]) {}

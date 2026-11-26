@@ -133,7 +133,7 @@ private struct NowPlayingAutoMixStatus: View {
 /// The quality pill under the scrubber. Its label is the tier that is
 /// playing; the checkmark in its menu is the tier the listener chose. The
 /// two differ for a song that lacks the chosen tier.
-private struct NowPlayingQualityMenu: View {
+struct NowPlayingQualityMenu: View {
     @Environment(PlayerStore.self) private var player
     @Environment(AppSettings.self) private var settings
 
@@ -179,29 +179,14 @@ private struct NowPlayingQualityMenu: View {
         guard let playing = player.effectivePlaybackQuality else {
             return L10n.string("ui.player.quality")
         }
-        // The pill names what is playing. With Apple Music's options on, a
-        // tier reached through one of them is named as that option.
-        if settings.usesAppleMusicQualityOptions,
-           let option = settings.appleMusicOption(for: playing) {
-            return settings.title(for: option)
-        }
-        return settings.title(for: playing)
+        return player.isCurrentQualityVerified
+            ? playing.title
+            : L10n.format("ui.player.quality_estimated", playing.title)
     }
 
     /// The QQ tier an option in the menu asks for.
     private func tier(for quality: MusicQuality) -> MusicQuality {
-        settings.usesAppleMusicQualityOptions
-            ? settings.appleMusicTarget(for: quality)
-            : quality
-    }
-
-    /// Apple Music's name for an option, QQ's for a tier reached otherwise.
-    private func title(for quality: MusicQuality) -> String {
-        if settings.usesAppleMusicQualityOptions,
-           let option = settings.appleMusicOption(for: quality) {
-            return settings.title(for: option)
-        }
-        return settings.title(for: quality)
+        settings.requestedQuality(for: quality)
     }
 
     /// Names the tier that is playing in place of the chosen one.
@@ -212,8 +197,8 @@ private struct NowPlayingQualityMenu: View {
         }
         return L10n.format(
             "ui.player.quality_downgraded",
-            title(for: player.preferredPlaybackQuality),
-            title(for: playing)
+            player.preferredPlaybackQuality.title,
+            displayedQualityTitle
         )
     }
 
@@ -225,14 +210,16 @@ private struct NowPlayingQualityMenu: View {
             Toggle(
                 isOn: Binding(
                     get: {
-                        tier(for: quality) == player.preferredPlaybackQuality
+                        quality == player.selectedPlaybackQualityOption
                     },
                     set: { _ in player.selectSessionPlaybackQuality(quality) }
                 )
             ) {
                 Text(settings.title(for: quality))
-                if player.currentSongOffers(tier(for: quality)) == false {
-                    Text("ui.player.quality_not_in_song")
+                switch player.currentQualityEvidence(for: tier(for: quality)) {
+                case .untested: Text("ui.player.quality_untested")
+                case .verified: Text("ui.player.quality_verified")
+                case .unavailable: Text("ui.player.quality_source_unavailable")
                 }
             }
         }

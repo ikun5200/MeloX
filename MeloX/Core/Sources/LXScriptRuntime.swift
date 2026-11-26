@@ -1,6 +1,7 @@
 import CryptoKit
 import Foundation
 import JavaScriptCore
+import os
 import Security
 
 nonisolated struct LXScriptInfo: Sendable {
@@ -114,6 +115,7 @@ nonisolated enum LXScriptError: LocalizedError, Sendable {
     case notInitialized
     case javaScript(String)
     case requestTimedOut
+    case httpStatus(Int)
     case invalidURL
     case invalidResponse
 
@@ -131,6 +133,8 @@ nonisolated enum LXScriptError: LocalizedError, Sendable {
             "洛雪源脚本错误：\(message)"
         case .requestTimedOut:
             "洛雪源解析播放地址超时。"
+        case .httpStatus(let status):
+            "音源请求未成功（HTTP \(status)）。"
         case .invalidURL:
             "洛雪源返回了无效的播放地址。"
         case .invalidResponse:
@@ -153,6 +157,29 @@ nonisolated final class LXScriptRuntime: @unchecked Sendable {
     private var descriptor: LXScriptDescriptor?
     private var initContinuation: CheckedContinuation<LXScriptDescriptor, Error>?
     private var musicContinuations: [String: CheckedContinuation<String, Error>] = [:]
+    // JS callbacks, timers and these bindings all run on `queue`. Keep a
+    // native HTTP denial attached to the musicUrl invocation that caused it.
+    private var activeMusicID: String?
+    private var deniedRequests: [URLRequestIdentity: Int] = [:]
+    private struct URLRequestIdentity: Hashable {
+        let url: URL
+        let method: String?
+        let body: Data?
+    }
+
+    /// Comparison key only, never a URL to request. Signed variants of one
+    /// resource share a denial; keep explicit media selectors so unrelated
+    /// tracks behind a common endpoint don't inherit it.
+    static func resourceAddress(_ url: URL) -> URL {
+        guard var parts = URLComponents(url: url.standardized, resolvingAgainstBaseURL: true) else { return url }
+        let selectors: Set<String> = ["id", "mid", "song", "songid", "songmid", "file", "fileid", "filename", "media_mid"]
+        let items = parts.queryItems?.filter { selectors.contains($0.name.lowercased()) } ?? []
+        parts.queryItems = items.isEmpty ? nil : items.sorted { ($0.name, $0.value ?? "") < ($1.name, $1.value ?? "") }
+        parts.fragment = nil
+        parts.user = nil
+        parts.password = nil
+        return parts.url ?? url
+    }
     private var httpTasks: [String: URLSessionDataTask] = [:]
     private var timerWorkItems: [String: DispatchWorkItem] = [:]
     private var updateAlert: [String: Any]?
@@ -216,9 +243,7 @@ nonisolated final class LXScriptRuntime: @unchecked Sendable {
         source: String = "tx",
         timeout: TimeInterval = 20
     ) async throws -> String {
-        guard descriptor != nil, !isShutdown else {
-            throw LXScriptError.notInitialized
-        }
+        try Task.checkCancellation()
         let musicInfoJSON: String
         do {
             musicInfoJSON = try Self.jsonString(musicInfo)
@@ -227,40 +252,38 @@ nonisolated final class LXScriptRuntime: @unchecked Sendable {
         }
 
         let requestID = UUID().uuidString
-        return try await withCheckedThrowingContinuation { continuation in
-            queue.async {
-                guard !self.isShutdown, let context = self.context else {
-                    continuation.resume(
-                        throwing: LXScriptError.notInitialized
-                    )
-                    return
-                }
-                self.musicContinuations[requestID] = continuation
-                context.exception = nil
-                context.objectForKeyedSubscript("__lxRequestMusicUrl")?
-                    .call(withArguments: [
-                        requestID,
-                        source,
-                        quality,
-                        musicInfoJSON,
-                    ])
-                if let exception = context.exception {
-                    context.exception = nil
-                    self.finishMusicRequest(
-                        requestID,
-                        error: exception.toString() ?? "javascript error",
-                        result: ""
-                    )
-                }
-                self.queue.asyncAfter(deadline: .now() + timeout) {
-                    guard let continuation = self.musicContinuations
-                        .removeValue(forKey: requestID) else {
+        let cancelled = OSAllocatedUnfairLock(initialState: false)
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                queue.async {
+                    guard !cancelled.withLock({ $0 }) else {
+                        continuation.resume(throwing: CancellationError())
                         return
                     }
-                    continuation.resume(
-                        throwing: LXScriptError.requestTimedOut
-                    )
+                    guard self.descriptor != nil, !self.isShutdown, let context = self.context else {
+                        continuation.resume(throwing: LXScriptError.notInitialized)
+                        return
+                    }
+                    self.musicContinuations[requestID] = continuation
+                    self.activeMusicID = requestID
+                    defer { self.activeMusicID = nil }
+                    context.exception = nil
+                    context.objectForKeyedSubscript("__lxRequestMusicUrl")?
+                        .call(withArguments: [requestID, source, quality, musicInfoJSON])
+                    if let exception = context.exception {
+                        context.exception = nil
+                        self.finishMusicRequest(requestID, error: exception.toString() ?? "javascript error", result: "")
+                    }
+                    self.queue.asyncAfter(deadline: .now() + timeout) {
+                        self.musicContinuations.removeValue(forKey: requestID)?
+                            .resume(throwing: LXScriptError.requestTimedOut)
+                    }
                 }
+            }
+        } onCancel: {
+            cancelled.withLock { $0 = true }
+            self.queue.async {
+                self.musicContinuations.removeValue(forKey: requestID)?.resume(throwing: CancellationError())
             }
         }
     }
@@ -296,45 +319,40 @@ nonisolated final class LXScriptRuntime: @unchecked Sendable {
 
         let send: @convention(block) (String, String) -> Void = {
             [weak self] event, json in
-            self?.enqueue { self?.handleSend(event: event, json: json) }
+            guard let self else { return }
+            self.enqueue { self.handleSend(event: event, json: json) }
         }
         let request: @convention(block) (String, String, String) -> Void = {
             [weak self] requestID, url, options in
-            self?.enqueue {
-                self?.handleHTTPRequest(
-                    requestID: requestID,
-                    urlString: url,
-                    optionsJSON: options
-                )
+            guard let self else { return }
+            let owner = self.activeMusicID
+            self.enqueue {
+                self.handleHTTPRequest(requestID: requestID, urlString: url, optionsJSON: options, owner: owner)
             }
         }
         let cancel: @convention(block) (String) -> Void = {
             [weak self] requestID in
-            self?.enqueue { self?.cancelHTTPRequest(requestID) }
+            guard let self else { return }
+            self.enqueue { self.cancelHTTPRequest(requestID) }
         }
-        let log: @convention(block) (String, String) -> Void = {
-            level, message in
-            print("[LX][\(level)] \(message)")
-        }
+        // Untrusted console messages (and even the level) can contain a
+        // signed media URL or script credentials. Never forward them to logs.
+        let log: @convention(block) (String, String) -> Void = { _, _ in }
         let resolveMusic: @convention(block) (String, String, String) -> Void = {
             [weak self] requestID, error, result in
-            self?.enqueue {
-                self?.finishMusicRequest(
-                    requestID,
-                    error: error,
-                    result: result
-                )
-            }
+            guard let self else { return }
+            self.enqueue { self.finishMusicRequest(requestID, error: error, result: result) }
         }
         let setTimer: @convention(block) (String, Double) -> Void = {
             [weak self] timerID, milliseconds in
-            self?.enqueue {
-                self?.scheduleTimer(timerID, milliseconds: milliseconds)
-            }
+            guard let self else { return }
+            let owner = self.activeMusicID
+            self.enqueue { self.scheduleTimer(timerID, milliseconds: milliseconds, owner: owner) }
         }
         let clearTimer: @convention(block) (String) -> Void = {
             [weak self] timerID in
-            self?.enqueue { self?.cancelTimer(timerID) }
+            guard let self else { return }
+            self.enqueue { self.cancelTimer(timerID) }
         }
         let md5: @convention(block) (String) -> String = { value in
             let digest = Insecure.MD5.hash(data: Data(value.utf8))
@@ -449,7 +467,7 @@ nonisolated final class LXScriptRuntime: @unchecked Sendable {
                     name: dictionary["name"] as? String ?? id,
                     type: dictionary["type"] as? String ?? "music",
                     actions: dictionary["actions"] as? [String] ?? [],
-                    qualitys: dictionary["qualitys"] as? [String] ?? []
+                    qualitys: (dictionary["qualitys"] as? [Any])?.compactMap { $0 as? String } ?? []
                 )
             )
         }
@@ -468,8 +486,10 @@ nonisolated final class LXScriptRuntime: @unchecked Sendable {
     private func handleHTTPRequest(
         requestID: String,
         urlString: String,
-        optionsJSON: String
+        optionsJSON: String,
+        owner: String?
     ) {
+        guard !isShutdown, owner.map({ musicContinuations[$0] != nil }) ?? true else { return }
         guard let url = URL(string: urlString),
               let scheme = url.scheme?.lowercased(),
               scheme == "http" || scheme == "https" else {
@@ -526,20 +546,37 @@ nonisolated final class LXScriptRuntime: @unchecked Sendable {
             )
         }
 
+        let resource = URLRequestIdentity(url: Self.resourceAddress(url), method: request.httpMethod, body: request.httpBody)
+        if let status = deniedRequests[resource] {
+            rejectHTTP(status, requestID: requestID, owner: owner)
+            return
+        }
         let task = session.dataTask(with: request) {
             [weak self] data, response, error in
             guard let self else { return }
             self.enqueue {
                 self.httpTasks[requestID] = nil
-                if let error {
-                    self.respondHTTP(
-                        requestID: requestID,
-                        error: error.localizedDescription,
-                        response: [:]
-                    )
+                guard !self.isShutdown else { return }
+                self.activeMusicID = owner
+                defer { self.activeMusicID = nil }
+                let http = response as? HTTPURLResponse
+                if let status = http?.statusCode, [401, 402, 403].contains(status) {
+                    self.deniedRequests[resource] = status
+                    self.rejectHTTP(status, requestID: requestID, owner: owner)
                     return
                 }
-                let http = response as? HTTPURLResponse
+                guard owner.map({ self.musicContinuations[$0] != nil }) ?? true else { return }
+                if let status = http?.statusCode, status == 408 || status == 429 || (500...599).contains(status) {
+                    self.rejectHTTP(status, requestID: requestID, owner: owner)
+                    return
+                }
+                if let error {
+                    // A script may turn any transport failure into its own
+                    // "unsupported quality". Preserve the native uncertainty.
+                    if let owner { self.musicContinuations.removeValue(forKey: owner)?.resume(throwing: error) }
+                    self.respondHTTP(requestID: requestID, error: "network error", response: [:])
+                    return
+                }
                 var headers: [String: String] = [:]
                 if let rawHeaders = http?.allHeaderFields {
                     for (key, value) in rawHeaders {
@@ -585,6 +622,16 @@ nonisolated final class LXScriptRuntime: @unchecked Sendable {
         }
         httpTasks[requestID] = task
         task.resume()
+    }
+
+    private func rejectHTTP(_ status: Int, requestID: String, owner: String?) {
+        let failure = LXScriptError.httpStatus(status)
+        if let owner { musicContinuations.removeValue(forKey: owner)?.resume(throwing: failure) }
+        else if initContinuation != nil { finishInitialization(.failure(failure)) }
+        let previous = activeMusicID
+        activeMusicID = owner
+        defer { activeMusicID = previous }
+        respondHTTP(requestID: requestID, error: "HTTP \(status)", response: [:])
     }
 
     private func respondHTTP(
@@ -638,13 +685,17 @@ nonisolated final class LXScriptRuntime: @unchecked Sendable {
 
     private func scheduleTimer(
         _ timerID: String,
-        milliseconds: Double
+        milliseconds: Double,
+        owner: String?
     ) {
         cancelTimer(timerID)
         let delay = min(max(milliseconds, 0), 300_000) / 1_000
         let workItem = DispatchWorkItem { [weak self] in
             guard let self, !self.isShutdown else { return }
             self.timerWorkItems[timerID] = nil
+            guard owner.map({ self.musicContinuations[$0] != nil }) ?? true else { return }
+            self.activeMusicID = owner
+            defer { self.activeMusicID = nil }
             self.context?.objectForKeyedSubscript("__lxTimerFired")?
                 .call(withArguments: [timerID])
         }

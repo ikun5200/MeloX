@@ -8,6 +8,11 @@ struct PlaybackSource: Equatable, Sendable {
     let headers: [String: String]
     let sourceName: String?
     let qualityVerified: Bool
+    /// Only LX sources carry provenance. The tier asked of the script may
+    /// differ from `quality`, which describes the bytes it actually served.
+    let sourceID: UUID?
+    let requestedQuality: MusicQuality?
+    let configurationRevision: UInt64?
 
     init(
         url: URL,
@@ -16,7 +21,10 @@ struct PlaybackSource: Equatable, Sendable {
         quality: MusicQuality? = nil,
         headers: [String: String] = [:],
         sourceName: String? = nil,
-        qualityVerified: Bool = true
+        qualityVerified: Bool = true,
+        sourceID: UUID? = nil,
+        requestedQuality: MusicQuality? = nil,
+        configurationRevision: UInt64? = nil
     ) {
         self.url = url
         self.bitrate = bitrate
@@ -25,6 +33,9 @@ struct PlaybackSource: Equatable, Sendable {
         self.headers = headers
         self.sourceName = sourceName
         self.qualityVerified = qualityVerified
+        self.sourceID = sourceID
+        self.requestedQuality = requestedQuality
+        self.configurationRevision = configurationRevision
     }
 
     var preferredForwardBufferDuration: TimeInterval {

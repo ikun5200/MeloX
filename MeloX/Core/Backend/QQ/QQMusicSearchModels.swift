@@ -155,35 +155,35 @@ nonisolated enum QQMusicSearchParser {
         )
     }
 
-    /// `file` 给出这首歌每种编码的字节数，0 表示没有这一档。
-    /// `size_new` 的下标含义：0 臻品母带、1 臻品音质 2.0、2 臻品全景声 5.1。
+    /// Positive sizes describe files QQ listed, not the listener's entitlement
+    /// or the encodings independently authorized sources can deliver.
+    /// `size_new`: master, stereo surround, immersive surround.
     static func audioAvailability(
         from file: [String: Any]?
     ) -> SongAudioAvailability {
-        guard let file,
-              file["size_128mp3"] != nil || file["size_flac"] != nil else {
-            return .unknown
+        guard let file else { return .unknown }
+        func bytes(_ value: Any?) -> Int64? {
+            let size: Int64?
+            if let number = value as? NSNumber {
+                size = Int64(number.stringValue)
+            } else if let text = value as? String {
+                size = Int64(text.trimmingCharacters(in: .whitespacesAndNewlines))
+            } else {
+                size = nil
+            }
+            return size.flatMap { $0 > 0 ? $0 : nil }
         }
-        let extended = (file["size_new"] as? [Any] ?? []).map {
-            ($0 as? NSNumber)?.int64Value ?? 0
+        var sizes: [MusicQuality: Int64] = [:]
+        sizes[.standard] = bytes(file["size_128mp3"])
+        sizes[.high] = bytes(file["size_320mp3"])
+        sizes[.lossless] = bytes(file["size_flac"])
+        sizes[.hiResolution] = bytes(file["size_hires"])
+        let extended = file["size_new"] as? [Any] ?? []
+        let qualities: [MusicQuality] = [.ultraClearMaster, .highDefinitionSurround, .immersiveSurround]
+        for (quality, value) in zip(qualities, extended) {
+            sizes[quality] = bytes(value)
         }
-        func size(_ key: String) -> Int64 {
-            (file[key] as? NSNumber)?.int64Value ?? 0
-        }
-        func extendedSize(_ index: Int) -> Int64 {
-            extended.indices.contains(index) ? extended[index] : 0
-        }
-        return SongAudioAvailability(
-            encodingSizes: [
-                .standard: size("size_128mp3"),
-                .high: size("size_320mp3"),
-                .lossless: size("size_flac"),
-                .hiResolution: size("size_hires"),
-                .highDefinitionSurround: extendedSize(1),
-                .immersiveSurround: extendedSize(2),
-                .ultraClearMaster: extendedSize(0),
-            ]
-        )
+        return sizes.isEmpty ? .unknown : SongAudioAvailability(encodingSizes: sizes)
     }
 
     static func artist(_ item: [String: Any]) -> QQSearchArtist? {

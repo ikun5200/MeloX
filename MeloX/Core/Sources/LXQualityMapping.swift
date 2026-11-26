@@ -40,13 +40,20 @@ nonisolated enum LXQualityMapping {
         declared: [String]
     ) -> [String] {
         let names = sourceNames(for: quality)
-        let declared = Set(declared.map { $0.lowercased() })
-        guard !declared.isEmpty else { return names }
+        let known = declared.compactMap(Self.quality(for:))
+        // An absent or completely unrecognized declaration describes no
+        // upper bound. Never send arbitrary strings from a declaration.
+        guard !known.isEmpty else { return names }
+        let declared = Set(declared.map(normalized))
         return names.filter(declared.contains)
     }
 
+    private static func normalized(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
     static func quality(for value: String) -> MusicQuality? {
-        switch value.lowercased() {
+        switch normalized(value) {
         case "128k": .standard
         case "320k": .high
         case "flac": .lossless
@@ -58,16 +65,15 @@ nonisolated enum LXQualityMapping {
         }
     }
 
-    /// A source reports the tier it was asked for, not the file it found.
-    /// QQ names its files by encoding, a four-character code followed by
-    /// the media id, so the name tells what a URL really serves.
+    /// A name is a hint for diagnostics, never proof of the bytes served.
+    /// Known preview and encrypted names are rejected conservatively.
     static func fileKind(for url: URL) -> FileKind? {
         let pathExtension = url.pathExtension.lowercased()
         if undecodableExtensions.contains(pathExtension) {
             return .undecodable
         }
         let name = url.deletingPathExtension().lastPathComponent
-        guard name.count >= 16,
+        guard name.count == 4 || name.count >= 16,
               name.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) })
         else {
             return nil
@@ -85,9 +91,10 @@ nonisolated enum LXQualityMapping {
         }
     }
 
-    /// Ogg and QQ's encrypted containers have no decoder on this platform.
+    /// Do not attempt to play an encrypted QQ resource. For ordinary
+    /// container extensions the probe rejects unsupported *bytes*, not names.
     private static let undecodableExtensions: Set<String> = [
-        "ogg", "mgg", "mflac", "mmp4", "mnac", "nac", "ape", "wma",
+        "mgg", "mflac", "mmp4", "mnac", "nac",
     ]
 
     static func rank(of quality: MusicQuality?) -> Int {

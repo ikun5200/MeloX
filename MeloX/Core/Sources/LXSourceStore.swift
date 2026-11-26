@@ -5,6 +5,8 @@ import Observation
 @Observable
 final class LXSourceStore {
     private(set) var sources: [LXSource] = []
+    /// Diagnostic changes such as lastError do not change playback authority.
+    private(set) var configurationRevision: UInt64 = 0
     private(set) var isWorking = false
     var errorMessage: String?
 
@@ -134,6 +136,7 @@ final class LXSourceStore {
     // MARK: - Management
 
     func remove(_ source: LXSource) {
+        guard sources.contains(where: { $0.id == source.id }) else { return }
         sources.removeAll { $0.id == source.id }
         normalizePriorities()
         save()
@@ -143,6 +146,7 @@ final class LXSourceStore {
         guard let index = sources.firstIndex(
             where: { $0.id == source.id }
         ) else { return }
+        guard sources[index].isEnabled != isEnabled else { return }
         sources[index].isEnabled = isEnabled
         save()
     }
@@ -159,17 +163,14 @@ final class LXSourceStore {
     }
 
     func refresh(_ source: LXSource) async {
-        guard let index = sources.firstIndex(
-            where: { $0.id == source.id }
-        ) else { return }
-
         await perform {
-            let runtime = LXScriptRuntime(preload: try self.loadPreload())
+            let runtime = LXScriptRuntime(preload: try self.loadPreload(), session: self.session)
+            defer { runtime.shutdown() }
             do {
-                let descriptor = try await runtime.initialize(
-                    script: source.rawScript
-                )
-                runtime.shutdown()
+                let descriptor = try await runtime.initialize(script: source.rawScript)
+                guard let index = self.sources.firstIndex(where: {
+                    $0.id == source.id && $0.rawScript == source.rawScript
+                }) else { return }
                 self.sources[index].capabilities = descriptor.sources
                 self.sources[index].name = descriptor.script.name
                 self.sources[index].version = descriptor.script.version
@@ -177,20 +178,19 @@ final class LXSourceStore {
                 self.sources[index].homepage = descriptor.script.homepage
                 self.sources[index].lastError = nil
                 self.sources[index].updatedAt = Date()
+                self.save()
             } catch {
-                runtime.shutdown()
-                self.sources[index].lastError = error.localizedDescription
+                self.updateAfterRuntimeFailure(source, error: error)
             }
-            self.save()
         }
     }
 
     func updateAfterRuntimeFailure(_ source: LXSource, error: Error) {
         guard let index = sources.firstIndex(
-            where: { $0.id == source.id }
+            where: { $0.id == source.id && $0.rawScript == source.rawScript }
         ) else { return }
         sources[index].lastError = error.localizedDescription
-        save()
+        save(configurationChanged: false)
     }
 
     // MARK: - Private
@@ -232,7 +232,7 @@ final class LXSourceStore {
         nameHint: String? = nil
     ) async throws {
         let info = LXScriptInfo.parse(script)
-        let runtime = LXScriptRuntime(preload: try loadPreload())
+        let runtime = LXScriptRuntime(preload: try loadPreload(), session: session)
         let descriptor: LXScriptDescriptor
         do {
             descriptor = try await runtime.initialize(
@@ -285,18 +285,8 @@ final class LXSourceStore {
     }
 
     private func normalizePriorities() {
-        let ordered = sources.enumerated()
-            .sorted { lhs, rhs in
-                if lhs.element.priority == rhs.element.priority {
-                    return lhs.offset < rhs.offset
-                }
-                return lhs.element.priority < rhs.element.priority
-            }
-            .map { $0.element.id }
-        for (priority, id) in ordered.enumerated() {
-            if let index = sources.firstIndex(where: { $0.id == id }) {
-                sources[index].priority = priority
-            }
+        for index in sources.indices {
+            sources[index].priority = index
         }
     }
 
@@ -304,11 +294,13 @@ final class LXSourceStore {
         guard let data = try? Data(contentsOf: fileURL) else { return }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        sources = (try? decoder.decode([LXSource].self, from: data)) ?? []
+        sources = ((try? decoder.decode([LXSource].self, from: data)) ?? [])
+            .sorted { $0.priority < $1.priority }
         normalizePriorities()
     }
 
-    private func save() {
+    private func save(configurationChanged: Bool = true) {
+        if configurationChanged { configurationRevision &+= 1 }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
