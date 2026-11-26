@@ -163,7 +163,7 @@ final class PlayerStore {
             ))
             qualityRows.append(.init(
                 label: "Next track",
-                value: debugNextPreparation
+                value: nextPreparation?.phase.rawValue ?? "idle"
             ))
             sections.append(.init(title: "Quality", rows: qualityRows))
 
