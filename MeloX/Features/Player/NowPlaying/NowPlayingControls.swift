@@ -176,8 +176,32 @@ private struct NowPlayingQualityMenu: View {
     }
 
     private var displayedQualityTitle: String {
-        player.effectivePlaybackQuality.map(settings.title(for:))
-            ?? L10n.string("ui.player.quality")
+        guard let playing = player.effectivePlaybackQuality else {
+            return L10n.string("ui.player.quality")
+        }
+        // The pill names what is playing. With Apple Music's options on, a
+        // tier reached through one of them is named as that option.
+        if settings.usesAppleMusicQualityOptions,
+           let option = settings.appleMusicOption(for: playing) {
+            return settings.title(for: option)
+        }
+        return settings.title(for: playing)
+    }
+
+    /// The QQ tier an option in the menu asks for.
+    private func tier(for quality: MusicQuality) -> MusicQuality {
+        settings.usesAppleMusicQualityOptions
+            ? settings.appleMusicTarget(for: quality)
+            : quality
+    }
+
+    /// Apple Music's name for an option, QQ's for a tier reached otherwise.
+    private func title(for quality: MusicQuality) -> String {
+        if settings.usesAppleMusicQualityOptions,
+           let option = settings.appleMusicOption(for: quality) {
+            return settings.title(for: option)
+        }
+        return settings.title(for: quality)
     }
 
     /// Names the tier that is playing in place of the chosen one.
@@ -188,8 +212,8 @@ private struct NowPlayingQualityMenu: View {
         }
         return L10n.format(
             "ui.player.quality_downgraded",
-            settings.title(for: player.preferredPlaybackQuality),
-            settings.title(for: playing)
+            title(for: player.preferredPlaybackQuality),
+            title(for: playing)
         )
     }
 
@@ -200,12 +224,14 @@ private struct NowPlayingQualityMenu: View {
         ForEach(options) { quality in
             Toggle(
                 isOn: Binding(
-                    get: { quality == player.preferredPlaybackQuality },
+                    get: {
+                        tier(for: quality) == player.preferredPlaybackQuality
+                    },
                     set: { _ in player.selectSessionPlaybackQuality(quality) }
                 )
             ) {
                 Text(settings.title(for: quality))
-                if player.currentSongOffers(quality) == false {
+                if player.currentSongOffers(tier(for: quality)) == false {
                     Text("ui.player.quality_not_in_song")
                 }
             }

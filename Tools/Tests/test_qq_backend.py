@@ -18,7 +18,9 @@ SOURCES = [
     "MeloX/Core/Lyrics/QQMusicLyricMatchStore.swift",
     "MeloX/Core/Lyrics/QQMusicLyricMatcher.swift",
     "MeloX/Core/Settings/Playback/MusicQuality.swift",
+    "MeloX/Core/Models/Music/SongAudioAvailability.swift",
     "MeloX/Core/Sources/LXQualityMapping.swift",
+    "MeloX/Core/Sources/LXStreamProbe.swift",
 ]
 
 STUBS = r"""
@@ -32,8 +34,14 @@ enum L10n {
     }
 }
 
-struct SongAudioAvailability {
-    func supports(apiLevel: String) -> Bool? { true }
+enum LXPlaybackError: LocalizedError {
+    case unplayableStream(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .unplayableStream(let reason): reason
+        }
+    }
 }
 
 struct LyricsSongMetadata: Hashable, Sendable {
@@ -64,42 +72,84 @@ struct Harness {
                 == "zzcf0e03e5gx4qeiq5cfgdyqwu7sdqfsb5fro3aa45053"
         )
 
+        // The chosen tier first, then one QQ step down at a time.
         precondition(
-            LXQualityMapping.candidates(
-                for: .ultraClearMaster,
-                supported: ["master", "flac", "320k"]
-            ) == ["master", "flac", "320k"]
+            LXQualityMapping.ladder(from: .lossless)
+                == [.lossless, .high, .standard]
         )
         precondition(
-            LXQualityMapping.candidates(
+            LXQualityMapping.ladder(from: .standard) == [.standard]
+        )
+        // A source is asked for the names it declares.
+        precondition(
+            LXQualityMapping.sourceNames(for: .hiResolution)
+                == ["hires", "flac24bit"]
+        )
+        precondition(
+            LXQualityMapping.sourceNames(
                 for: .high,
-                supported: ["flac"]
-            ) == ["flac"]
+                declared: ["128k", "320k", "flac"]
+            ) == ["320k"]
         )
         precondition(
-            LXQualityMapping.candidates(
-                for: .standard,
-                supported: []
-            ) == ["128k"]
+            LXQualityMapping.sourceNames(for: .standard, declared: [])
+                == ["128k"]
         )
+
+        // The bytes decide what a stream is: QQ's own servers label their
+        // FLAC files `audio/x-ogg`.
+        precondition(LXStreamProbe.container(of: Array("fLaC".utf8)) == .flac)
+        precondition(LXStreamProbe.container(of: Array("OggS".utf8)) == .ogg)
+        precondition(
+            LXStreamProbe.container(of: [0xFF, 0xFB, 0x90, 0x64]) == .mpeg
+        )
+        precondition(
+            LXStreamProbe.container(of: Array("<html>".utf8)) == .text
+        )
+        let flacHead: [UInt8] = [
+            0x66, 0x4C, 0x61, 0x43, 0x80, 0x00, 0x00, 0x22,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x17, 0x70, 0x03, 0x70, 0x01, 0x3B,
+            0xCE, 0x1B,
+        ]
+        precondition(
+            LXStreamProbe.flacInfo(in: flacHead)
+                == LXStreamProbe.FLACInfo(
+                    sampleRate: 96_000,
+                    channelCount: 2,
+                    bitsPerSample: 24,
+                    duration: 215.58961458333334
+                )
+        )
+
+        // A file whose length is one of the song's encodings is that tier.
+        let availability = SongAudioAvailability(encodingSizes: [
+            .standard: 3_700_000,
+            .high: 9_000_000,
+            .lossless: 45_000_000,
+        ])
+        precondition(availability.quality(ofFileSized: 45_000_000) == .lossless)
+        precondition(availability.quality(ofFileSized: 45_000_001) == nil)
+        precondition(availability.smallestFileSize == 3_700_000)
+        precondition(availability.supports(.hiResolution) == false)
         precondition(
             LXQualityMapping.quality(for: "atmos_plus")
                 == .immersiveSurround
         )
         precondition(LXQualityMapping.quality(for: "unknown") == nil)
         precondition(
-            LXQualityMapping.bitrate(for: "320k") == 320_000
+            LXQualityMapping.bitrate(for: .high) == 320_000
         )
         precondition(
             LXQualityMapping.format(
                 for: URL(string: "https://example.com/a.flac")!,
-                quality: "flac"
+                quality: .lossless
             ) == "flac"
         )
         precondition(
             LXQualityMapping.format(
                 for: URL(string: "https://example.com/stream")!,
-                quality: "master"
+                quality: .ultraClearMaster
             ) == "flac"
         )
 

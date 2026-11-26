@@ -595,6 +595,8 @@
 "ui.settings.playback.section.playback" = "Playback";
 "ui.settings.playback.section.quality" = "Audio Quality";
 "ui.settings.playback.apple_music_quality" = "Apple Music-Style Quality Options";
+"ui.settings.playback.apple_mapping" = "Mapped QQ Music quality";
+"ui.settings.playback.apple_mapping_footer" = "Apple Music's three names do not line up with QQ Music's tiers. Choose the tier each one asks the source for; a song without it still steps down one QQ tier at a time.";
 "ui.settings.playback.quality.rule_footer" = "The chosen quality applies to every song. A song without that tier steps down through QQ Music’s tiers one at a time, for that song only; the next song returns to your choice. A quality picked on the Now Playing screen lasts until the app restarts.";
 "ui.settings.playback.quality.apple_footer" = "Shows three options: High Quality, Lossless and Hi-Res Lossless, which stand for QQ Music’s HQ (320 kbps), SQ Lossless (FLAC) and Hi-Res (24-bit). A song without the matching tier still steps down through QQ Music’s tiers one at a time, and the next song returns to your choice.";
 "ui.settings.playback.wifi_quality" = "Wi-Fi Playback Quality";

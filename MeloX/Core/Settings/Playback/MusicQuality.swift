@@ -39,6 +39,10 @@ nonisolated enum MusicQuality:
         .high, .lossless, .hiResolution,
     ]
 
+    /// The QQ tiers an Apple Music option may be pointed at. All seven:
+    /// which of them stands for "Hi-Res Lossless" is the listener's call.
+    static let appleMusicMapTargets: [MusicQuality] = allCases
+
     /// The name Apple Music gives the tier, where it has one.
     var appleMusicTitle: String {
         switch self {

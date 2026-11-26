@@ -356,11 +356,53 @@ final class AppSettings {
         }
     }
 
+    /// The QQ tier each of Apple Music's three options asks for, as the
+    /// listener set them. Kept in view state so a change reaches the picker
+    /// and the request for the playing song at once.
+    private(set) var appleMusicQualityTargets:
+        [MusicQuality: MusicQuality] = [:]
+
     /// The tiers a quality picker lists.
     var selectableMusicQualities: [MusicQuality] {
         usesAppleMusicQualityOptions
             ? MusicQuality.appleMusicOptions
             : MusicQuality.allCases
+    }
+
+    /// The QQ tier one of Apple Music's options asks for. Apple Music and
+    /// QQ do not pair up neatly — Hi-Res is on a few percent of QQ's
+    /// catalogue while its master tier is on most of it — so the pairing is
+    /// the listener's to change in Settings.
+    func appleMusicTarget(for option: MusicQuality) -> MusicQuality {
+        appleMusicQualityTargets[option.appleMusicEquivalent]
+            ?? option.appleMusicEquivalent
+    }
+
+    func setAppleMusicTarget(_ tier: MusicQuality, for option: MusicQuality) {
+        appleMusicQualityTargets[option.appleMusicEquivalent] = tier
+        defaults.set(
+            tier.rawValue,
+            forKey: Self.appleMusicTargetKey(option)
+        )
+    }
+
+    /// The Apple Music option that stands for a QQ tier, when one does.
+    func appleMusicOption(for tier: MusicQuality) -> MusicQuality? {
+        MusicQuality.appleMusicOptions.first {
+            appleMusicTarget(for: $0) == tier
+        }
+    }
+
+    /// The tier a stored choice asks QQ for. With Apple Music's options in
+    /// use the choice is one of the three and stands for the tier it is
+    /// mapped to; otherwise it is the tier itself.
+    func requestedQuality(for choice: MusicQuality) -> MusicQuality {
+        guard usesAppleMusicQualityOptions else { return choice }
+        return appleMusicTarget(for: choice.appleMusicEquivalent)
+    }
+
+    private static func appleMusicTargetKey(_ option: MusicQuality) -> String {
+        "appleMusicTarget.\(option.appleMusicEquivalent.rawValue)"
     }
 
     func title(for quality: MusicQuality) -> String {
@@ -1401,6 +1443,16 @@ final class AppSettings {
             qqCredential = stored
         }
         quality = MusicQuality(rawValue: defaults.string(forKey: Key.quality) ?? "") ?? .high
+        var storedTargets: [MusicQuality: MusicQuality] = [:]
+        for option in MusicQuality.appleMusicOptions {
+            guard let raw = defaults.string(
+                forKey: Self.appleMusicTargetKey(option)
+            ), let tier = MusicQuality(rawValue: raw) else {
+                continue
+            }
+            storedTargets[option] = tier
+        }
+        appleMusicQualityTargets = storedTargets
         cellularQuality = MusicQuality(
             rawValue: defaults.string(forKey: Key.cellularQuality) ?? ""
         ) ?? .high

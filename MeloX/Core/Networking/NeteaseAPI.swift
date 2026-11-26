@@ -80,10 +80,14 @@ final class NeteaseAPI {
 
     var playbackQuality: MusicQuality {
         if isCellularData {
-            return sessionCellularPlaybackQuality
-                ?? settings.cellularQuality
+            return settings.requestedQuality(
+                for: sessionCellularPlaybackQuality
+                    ?? settings.cellularQuality
+            )
         }
-        return sessionPlaybackQuality ?? settings.quality
+        return settings.requestedQuality(
+            for: sessionPlaybackQuality ?? settings.quality
+        )
     }
 
     var hasSessionPlaybackQuality: Bool {

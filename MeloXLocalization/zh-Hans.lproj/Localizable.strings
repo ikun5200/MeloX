@@ -595,6 +595,8 @@
 "ui.settings.playback.section.playback" = "播放";
 "ui.settings.playback.section.quality" = "音质";
 "ui.settings.playback.apple_music_quality" = "Apple Music 式音质选项";
+"ui.settings.playback.apple_mapping" = "对应 QQ 音乐音质";
+"ui.settings.playback.apple_mapping_footer" = "Apple Music 的三档名称不直接对应 QQ 音乐的音质。每一档向音源请求哪一档可以在这里改：歌曲没有这一档时，仍按 QQ 的档位逐档下降。";
 "ui.settings.playback.quality.rule_footer" = "所选音质对每首歌都生效。歌曲没有这一档时，按 QQ 音乐的档位逐档降低，只影响这一首，下一首恢复所选音质。在播放页切换的音质只在本次启动内有效。";
 "ui.settings.playback.quality.apple_footer" = "只显示高质量、无损、高解析度无损三档，分别对应 QQ 音乐的 HQ 高品质（320 kbps）、SQ 无损（FLAC）和 Hi-Res（24 bit）。歌曲没有对应的一档时，仍按 QQ 音乐的档位逐档降低，下一首恢复所选音质。";
 "ui.settings.playback.wifi_quality" = "无线网络播放音质";

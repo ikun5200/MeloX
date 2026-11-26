@@ -49,6 +49,31 @@ struct PlaybackSettingsView: View {
                 )
             }
 
+            // Each of the three stands for a QQ tier. Apple's names and
+            // QQ's tiers do not pair up neatly, so the pairing is here to
+            // be changed.
+            if settings.usesAppleMusicQualityOptions {
+                Section {
+                    ForEach(MusicQuality.appleMusicOptions) { option in
+                        Picker(
+                            selection: mappingBinding(for: option)
+                        ) {
+                            ForEach(MusicQuality.appleMusicMapTargets) { tier in
+                                Text(tier.title).tag(tier)
+                            }
+                        } label: {
+                            Text(settings.title(for: option))
+                        }
+                        // Seven tiers do not fit a menu; a page shows them all.
+                        .pickerStyle(.navigationLink)
+                    }
+                } header: {
+                    Text("ui.settings.playback.apple_mapping")
+                } footer: {
+                    Text("ui.settings.playback.apple_mapping_footer")
+                }
+            }
+
             Section {
                 Picker(
                     "ui.settings.playback.volume_control",
@@ -128,6 +153,22 @@ struct PlaybackSettingsView: View {
         Binding(
             get: { isCellular ? settings.cellularQuality : settings.quality },
             set: { player.selectPlaybackQuality($0, forCellularData: isCellular) }
+        )
+    }
+
+    /// The QQ tier one of Apple Music's options stands for. Changing it
+    /// re-asks the sources for the song playing, so the new pairing takes
+    /// effect without waiting for the next song.
+    private func mappingBinding(for option: MusicQuality) -> Binding<MusicQuality> {
+        Binding(
+            get: { settings.appleMusicTarget(for: option) },
+            set: { tier in
+                guard settings.appleMusicTarget(for: option) != tier else {
+                    return
+                }
+                settings.setAppleMusicTarget(tier, for: option)
+                player.refreshQualityMapping()
+            }
         )
     }
 }
