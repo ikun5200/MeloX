@@ -79,7 +79,8 @@ struct MeloXApp: App {
             player: player,
             api: api,
             settings: settings,
-            downloads: downloads
+            downloads: downloads,
+            sources: sourceStore
         )
         #endif
         _settings = State(initialValue: settings)

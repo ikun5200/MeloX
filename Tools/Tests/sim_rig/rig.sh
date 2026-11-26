@@ -2,9 +2,11 @@
 # Simulator rig for exercising playback against a controllable source.
 #
 #   rig.sh up [--no-build]  fixtures, HTTPS server, CA trust, build, install
-#   rig.sh seed             install the test source and skip first-run prompts
+#   rig.sh seed [--bare]    install the test source (or none), skip first-run prompts
 #   rig.sh launch           (re)start the app, logging inside the simulator
 #   rig.sh do <cmd> [s]     send a debug command, wait, print the app state
+#   rig.sh source <file>    import the real source whose address <file> holds
+#   rig.sh find <words> [n] [s]  play the n-th real song found for <words>
 #   rig.sh behave <json>    set what the source answers (see server.py)
 #   rig.sh ui <steps>       real touches through XCUITest (see UIRig/UIRigTests)
 #   rig.sh shot <name>      screenshot to $RIG/<name>.png
@@ -13,8 +15,10 @@
 #   rig.sh crashes          crash reports written since `launch`
 #   rig.sh down             stop the server
 #
-# Commands are listed in MeloX/App/DebugAutomation.swift. The source answers
-# from a local server with generated audio; no real source is involved.
+# Commands are listed in MeloX/App/DebugAutomation.swift. The seeded source
+# answers from a local server with generated audio. `source` replaces it with
+# a real one, whose address stays in a file outside the tree: an address
+# carries its key, and neither may be committed or logged.
 # Nothing here is used by device or Release builds.
 set -euo pipefail
 
@@ -53,6 +57,21 @@ send() {
   return 1
 }
 
+show() {
+  python3 -I -c '
+import json, sys
+s = json.load(open(sys.argv[1], encoding="utf-8"))
+print("  ".join(f"{k}={s[k]}" for k in ("song", "isPlaying", "isLoading", "progress", "playing", "requested", "switching")))
+print("  offered=" + ",".join(s["offered"]))
+if s.get("stream"): print("  stream: " + s["stream"] + "  (" + s.get("artist", "") + ", " + str(s.get("seconds", 0)) + "s)")
+if s.get("sources"): print("  sources: " + "; ".join(s["sources"]))
+if s.get("note"): print("  note: " + s["note"])
+if s["issue"]: print("  ISSUE: " + s["issue"])
+if s["notice"]: print("  notice: " + s["notice"])' "$(container)/Documents/debug-state.json"
+}
+
+quote() { python3 -I -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$1"; }
+
 case "${1:-}" in
   up)
     bash "$HERE/make_fixtures.sh" "$RIG" >/dev/null
@@ -90,9 +109,9 @@ case "${1:-}" in
       # shellcheck disable=SC2086
       xcrun simctl spawn "$U" defaults write "$BUNDLE_ID" $pair
     done
-    python3 -I - "$HERE/test_source.js" "$(container)" "https://localhost:$PORT" "$QUALITYS" <<'EOF'
+    python3 -I - "$HERE/test_source.js" "$(container)" "https://localhost:$PORT" "$QUALITYS" "${2:-}" <<'EOF'
 import json, os, sys, uuid, datetime
-script_path, container, backend, qualitys = sys.argv[1:5]
+script_path, container, backend, qualitys, mode = sys.argv[1:6]
 script = open(script_path, encoding="utf-8").read()
 script = script.replace("__BACKEND__", backend).replace("__QUALITYS__", qualitys)
 source = {
@@ -113,7 +132,7 @@ source = {
 directory = os.path.join(container, "Library", "Application Support", "MeloX")
 os.makedirs(directory, exist_ok=True)
 with open(os.path.join(directory, "LXSources.json"), "w", encoding="utf-8") as f:
-    json.dump([source], f, ensure_ascii=False, indent=2)
+    json.dump([] if mode == "--bare" else [source], f, ensure_ascii=False, indent=2)
 print("seeded", os.path.join(directory, "LXSources.json"))
 EOF
     ;;
@@ -137,13 +156,23 @@ EOF
     send "$COMMAND"
     sleep "${3:-1}"
     send state
-    python3 -I -c '
-import json, sys
-s = json.load(open(sys.argv[1], encoding="utf-8"))
-print("  ".join(f"{k}={s[k]}" for k in ("song", "isPlaying", "isLoading", "progress", "playing", "requested", "switching")))
-print("  offered=" + ",".join(s["offered"]))
-if s["issue"]: print("  ISSUE: " + s["issue"])
-if s["notice"]: print("  notice: " + s["notice"])' "$(container)/Documents/debug-state.json"
+    show
+    ;;
+  source)
+    ADDRESS="$(tr -d '[:space:]' < "${2:?file holding the source address}")"
+    send "source?only=1&url=$(quote "$ADDRESS")"
+    for _ in $(seq 1 40); do
+      sleep 1
+      send state
+      grep -q '"note" : "importing"' "$(container)/Documents/debug-state.json" || break
+    done
+    show
+    ;;
+  find)
+    send "find?q=$(quote "${2:?keywords}")&index=${3:-0}"
+    sleep "${4:-6}"
+    send state
+    show
     ;;
   behave)
     echo "${2:?json}" > "$RIG/behaviours.json"
@@ -156,7 +185,8 @@ if s["notice"]: print("  notice: " + s["notice"])' "$(container)/Documents/debug
   ui)
     U="$(udid)"
     UI_DERIVED="${MELOX_RIG_UI_DERIVED:-/tmp/melox-uirig-dd}"
-    if [[ ! -d "$UI_DERIVED/Build/Products/Debug-iphonesimulator/UIRig-Runner.app" ]]; then
+    RUNNER="$UI_DERIVED/Build/Products/Debug-iphonesimulator/UIRig-Runner.app"
+    if [[ ! -d "$RUNNER" || "$HERE/UIRig/UIRigTests/UIRig.swift" -nt "$RUNNER" ]]; then
       xcodebuild build-for-testing -project "$HERE/UIRig/UIRig.xcodeproj" -scheme UIRig \
         -destination "id=$U" -derivedDataPath "$UI_DERIVED" > "$RIG/ui-build.log" 2>&1 \
         || { grep -E "error:" "$RIG/ui-build.log" | sort -u | head -20; exit 1; }

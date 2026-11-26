@@ -8,6 +8,8 @@ import XCTest
 ///     tap:<label>      first hittable element with that label or text
 ///     tapxy:<x>,<y>    a point, as fractions of the screen
 ///     hold:<label>     long press
+///     type:<text>      into the focused field
+///     enter            the keyboard's return key
 ///     swipe:<up|down|left|right>
 ///     wait:<seconds>
 ///     shot:<name>      screenshot to <RIG_OUT>/<name>.png
@@ -47,6 +49,10 @@ final class UIRig: XCTestCase {
                 app.coordinate(
                     withNormalizedOffset: CGVector(dx: values[0], dy: values[1])
                 ).tap()
+            case "type":
+                app.typeText(argument)
+            case "enter":
+                app.typeText("\n")
             case "swipe":
                 switch argument {
                 case "up": app.swipeUp()

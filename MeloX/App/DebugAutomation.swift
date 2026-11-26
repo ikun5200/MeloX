@@ -18,11 +18,15 @@ enum MeloXDebugAutomation {
     /// can be told from another by its length.
     private static var fixtureSizes: [String: Int64] = [:]
 
+    /// What the last asynchronous command came to, for the host to read.
+    private static var note = ""
+
     static func start(
         player: PlayerStore,
         api: NeteaseAPI,
         settings: AppSettings,
-        downloads: DownloadStore
+        downloads: DownloadStore,
+        sources: LXSourceStore
     ) {
         guard pollTask == nil,
               let documents = FileManager.default.urls(
@@ -47,7 +51,8 @@ enum MeloXDebugAutomation {
                     player: player,
                     api: api,
                     settings: settings,
-                    downloads: downloads
+                    downloads: downloads,
+                    sources: sources
                 )
             }
         }
@@ -58,7 +63,8 @@ enum MeloXDebugAutomation {
         player: PlayerStore,
         api: NeteaseAPI,
         settings: AppSettings,
-        downloads: DownloadStore
+        downloads: DownloadStore,
+        sources: LXSourceStore
     ) {
         guard let components = URLComponents(string: "debug:///\(command)") else {
             return
@@ -83,6 +89,49 @@ enum MeloXDebugAutomation {
                     songs.count - 1
                 )
                 await player.play(songs[index], in: songs)
+            }
+        case "source":
+            // Imports a source script the way the settings screen does. The
+            // host passes the address in; it is never kept in the tree.
+            guard let address = query["url"] else { break }
+            note = "importing"
+            Task {
+                if query["only"] == "1" {
+                    for source in sources.sources {
+                        sources.remove(source)
+                    }
+                }
+                await sources.addScriptURL(address)
+                note = sources.errorMessage ?? "imported"
+            }
+        case "find":
+            // Plays a real song, found the way the search screen finds it.
+            let keywords = query["q"] ?? ""
+            note = "searching"
+            Task {
+                do {
+                    var songs = try await api.search(
+                        keywords,
+                        kind: .songs
+                    ).songs ?? []
+                    if let details = try? await api.songDetails(
+                        ids: songs.map(\.id)
+                    ), !details.isEmpty {
+                        songs = details
+                    }
+                    guard !songs.isEmpty else {
+                        note = "nothing found"
+                        return
+                    }
+                    let index = min(
+                        max(Int(query["index"] ?? "") ?? 0, 0),
+                        songs.count - 1
+                    )
+                    note = "found \(songs.count)"
+                    await player.play(songs[index], in: songs)
+                } catch {
+                    note = "search failed: \(error.localizedDescription)"
+                }
             }
         case "quality":
             guard let quality = MusicQuality.allCases.first(where: {
@@ -155,7 +204,12 @@ enum MeloXDebugAutomation {
             break
         }
 
-        writeState(player: player, api: api, settings: settings)
+        writeState(
+            player: player,
+            api: api,
+            settings: settings,
+            sources: sources
+        )
     }
 
     /// Songs the rig's server knows by `mid`. Their availability mirrors what
@@ -238,11 +292,22 @@ enum MeloXDebugAutomation {
     private static func writeState(
         player: PlayerStore,
         api: NeteaseAPI,
-        settings: AppSettings
+        settings: AppSettings,
+        sources: LXSourceStore
     ) {
         let state: [String: Any] = [
             "song": player.currentSong?.name ?? "",
+            "artist": player.currentSong?.artistText ?? "",
+            "seconds": (player.currentSong?.durationMS ?? 0) / 1_000,
             "mid": player.currentSong?.mid ?? "",
+            "stream": player.debugStreamSummary,
+            "note": note,
+            // Names and declared qualities only: a source's address
+            // carries its key.
+            "sources": sources.sources.map { source in
+                "\(source.name) [\(source.isEnabled ? "on" : "off")] "
+                    + source.qqQualities.joined(separator: ",")
+            },
             "isPlaying": player.isPlaying,
             "isLoading": player.isLoading,
             "progress": (player.estimatedProgress() * 10).rounded() / 10,
