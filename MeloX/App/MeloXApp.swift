@@ -24,7 +24,11 @@ struct MeloXApp: App {
     @State private var isLowPowerModeEnabled = ProcessInfo.processInfo.isLowPowerModeEnabled
 
     init() {
+        #if DEBUG && targetEnvironment(simulator)
+        let settings = AppSettings(defaults: MeloXLibraryUIFixture.isEnabled ? MeloXLibraryUIFixture.defaults : .standard)
+        #else
         let settings = AppSettings()
+        #endif
         #if DEBUG && targetEnvironment(simulator)
         if MeloXDesignPreview.isEnabled {
             settings.hasCompletedOnboarding = true
@@ -42,7 +46,9 @@ struct MeloXApp: App {
         )
         let session: URLSession
         #if DEBUG && targetEnvironment(simulator)
-        session = FixturePlaybackSession.isEnabled ? FixturePlaybackSession.session : .shared
+        session = MeloXLibraryUIFixture.isEnabled
+            ? MeloXLibraryUIFixture.session
+            : (FixturePlaybackSession.isEnabled ? FixturePlaybackSession.session : .shared)
         #else
         session = .shared
         #endif
@@ -137,7 +143,7 @@ struct MeloXApp: App {
                 }
                 .task {
                     #if DEBUG && targetEnvironment(simulator)
-                    if FixturePlaybackSession.isEnabled { return }
+                    if FixturePlaybackSession.isEnabled || MeloXLibraryUIFixture.isEnabled { return }
                     #endif
                     phoneWatchSync.start()
                     await lyricsNotifications
@@ -145,6 +151,9 @@ struct MeloXApp: App {
                 }
                 .onChange(of: scenePhase) {
                     guard scenePhase == .active else { return }
+                    #if DEBUG && targetEnvironment(simulator)
+                    if MeloXLibraryUIFixture.isEnabled { return }
+                    #endif
                     Task {
                         await lyricsNotifications
                             .refreshAuthorizationStatus()

@@ -99,6 +99,7 @@ struct HomeEditorialCard: View {
 struct HomePlaylistCard: View {
     @Environment(\.musicShelfLayout) private var layout
     let playlist: Playlist
+    var compactArtworkSize: CGFloat = 166
 
     var body: some View {
         MediaCardView(
@@ -108,8 +109,8 @@ struct HomePlaylistCard: View {
                 ?? playlist.updateFrequency
                 ?? playlist.creator?.nickname,
             artworkURL: playlist.artworkURL,
-            artworkSize: layout.artworkSize(compact: 166)
+            artworkSize: layout.artworkSize(compact: compactArtworkSize)
         )
-        .frame(width: layout.artworkSize(compact: 166))
+        .frame(width: layout.artworkSize(compact: compactArtworkSize))
     }
 }

@@ -2,12 +2,14 @@ import SwiftUI
 
 struct MusicShelfLayout {
     var containerWidth: CGFloat = 390
+    var artworkWidthOverride: CGFloat? = nil
 
     private var isWide: Bool { containerWidth >= 600 }
     var horizontalPadding: CGFloat { isWide ? 28 : 16 }
     var spacing: CGFloat { isWide ? 20 : 14 }
 
     func artworkSize(compact: CGFloat) -> CGFloat {
+        if let artworkWidthOverride { return artworkWidthOverride }
         guard isWide else { return compact }
         let available = max(containerWidth - horizontalPadding * 2, 1)
         let columns = max(Int((available + spacing) / 200), 3)

@@ -168,12 +168,12 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
 
         let info = Self.dictionary(data["dirinfo"]) ?? [:]
         let creator = Self.dictionary(info["creator"]) ?? [:]
-        let songs = QQMusicSearchParser.songs(
-            Self.dictionaryArray(data["songlist"])
-        )
+        let songItems = Self.dictionaryArray(data["songlist"])
+        let songs = QQMusicSearchParser.songs(songItems)
+        let nextOffset = offset + songItems.count
         let total = Self.int(data["total_song_num"])
             ?? Self.int(info["songnum"])
-            ?? songs.count
+            ?? nextOffset
 
         return QQPlaylistDetail(
             id: Self.int(info["id"]) ?? id,
@@ -194,7 +194,8 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
             songs: songs,
             total: total,
             hasMore: (Self.int(data["hasmore"]) ?? 0) == 1
-                || total > offset + songs.count
+                || total > nextOffset,
+            nextOffset: nextOffset
         )
     }
 
@@ -824,30 +825,50 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
 
     func followedArtists(limit: Int = 100) async throws -> [QQSearchArtist] {
         let credential = try requireCredential()
-        guard !credential.encryptUIN.isEmpty else { return [] }
-        let data = try await authenticatedCall(
-            module: "music.concern.RelationList",
-            method: "GetFollowSingerList",
-            parameter: [
-                "HostUin": credential.encryptUIN,
-                "From": 0,
-                "Size": limit,
-            ]
-        )
-        return Self.dictionaryArray(data["List"]).compactMap { item in
-            guard let mid = Self.string(item["MID"]),
-                  let name = Self.string(item["Name"]) else {
-                return nil
-            }
-            return QQSearchArtist(
-                id: Self.int(item["SingerID"])
-                    ?? QQMusicSearchParser.stableID(mid),
-                mid: mid,
-                name: name,
-                avatarURL: Self.string(item["AvatarUrl"]),
-                isFollowed: true
+        guard !credential.encryptUIN.isEmpty else { throw QQMusicError.incompleteCredential }
+        let limit = max(limit, 1)
+        var offset = 0
+        var artists: [QQSearchArtist] = []
+        var seen: Set<Int> = []
+        while artists.count < limit {
+            try Task.checkCancellation()
+            let size = min(50, limit - artists.count)
+            let data = try await authenticatedCall(
+                module: "music.concern.RelationList",
+                method: "GetFollowSingerList",
+                parameter: ["HostUin": credential.encryptUIN, "From": offset, "Size": size]
             )
+            let list = data["List"] ?? data["list"] ?? data["users"] ?? data["SingerList"]
+            guard let items = list as? [[String: Any]] else { throw QQMusicError.invalidResponse }
+            let page = items.compactMap(Self.followedArtist)
+            guard items.isEmpty || !page.isEmpty else { throw QQMusicError.invalidResponse }
+            let previousCount = artists.count
+            artists.append(contentsOf: page.filter { seen.insert($0.id).inserted })
+            let nextOffset = offset + items.count
+            let total = Self.int(data["Total"] ?? data["total"] ?? data["TotalNum"])
+            let hasMore = Self.int(data["HasMore"] ?? data["hasMore"] ?? data["hasmore"])
+                .map { $0 != 0 } ?? total.map { nextOffset < $0 } ?? (items.count == size)
+            guard hasMore else { break }
+            guard nextOffset > offset, artists.count > previousCount else {
+                throw QQMusicError.invalidResponse
+            }
+            offset = nextOffset
         }
+        return Array(artists.prefix(limit))
+    }
+
+    private static func followedArtist(_ item: [String: Any]) -> QQSearchArtist? {
+        let mid = string(item["MID"] ?? item["mid"] ?? item["singer_mid"]) ?? ""
+        let identifier = int(item["SingerID"] ?? item["singer_id"] ?? item["id"]) ?? 0
+        guard let name = string(item["Name"] ?? item["name"] ?? item["singer_name"]),
+              !mid.isEmpty || identifier > 0 else { return nil }
+        return QQSearchArtist(
+            id: identifier > 0 ? identifier : QQMusicSearchParser.stableID(mid),
+            mid: mid,
+            name: name,
+            avatarURL: string(item["AvatarUrl"] ?? item["AvatarURL"] ?? item["avatar"] ?? item["pic"]),
+            isFollowed: true
+        )
     }
 
     // MARK: - Library writes
@@ -937,7 +958,7 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
         let failed = (data["v_failedPlaylistId"] as? [Any])?
             .compactMap { Self.int($0) } ?? []
         guard Self.int(data["result"]) == 0, !failed.contains(id) else {
-            throw QQMusicError.server(
+            throw QQMusicError.response(
                 code: Self.int(data["result"]) ?? -1,
                 message: nil
             )
@@ -954,7 +975,7 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
         let failed = (data["v_failedAlbumId"] as? [Any])?
             .compactMap { Self.int($0) } ?? []
         guard Self.int(data["result"]) == 0, !failed.contains(id) else {
-            throw QQMusicError.server(
+            throw QQMusicError.response(
                 code: Self.int(data["result"]) ?? -1,
                 message: nil
             )
@@ -1005,10 +1026,10 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
 
     private static func ensureSuccess(_ data: [String: Any]) throws {
         if let result = int(data["result"]), result != 0 {
-            throw QQMusicError.server(code: result, message: nil)
+            throw QQMusicError.response(code: result, message: nil)
         }
         if let retCode = int(data["retCode"]), retCode != 0 {
-            throw QQMusicError.server(code: retCode, message: nil)
+            throw QQMusicError.response(code: retCode, message: nil)
         }
     }
 
@@ -1198,7 +1219,7 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
         }
         let code = request["code"] as? Int ?? -1
         guard code == 0 || code == 200 else {
-            throw QQMusicError.server(
+            throw QQMusicError.response(
                 code: code,
                 message: request["msg"] as? String ?? ""
             )
@@ -1241,14 +1262,14 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
         guard let request = json["req_0"] as? [String: Any] else {
             throw QQMusicError.invalidResponse
         }
-        let code = request["code"] as? Int
-            ?? json["code"] as? Int
+        let code = Self.int(request["code"])
+            ?? Self.int(json["code"])
             ?? -1
         guard code == 0 || code == 200 else {
             let message = (request["msg"] as? String)
                 ?? (json["message"] as? String)
                 ?? ""
-            throw QQMusicError.server(code: code, message: message)
+            throw QQMusicError.response(code: code, message: message)
         }
         return request["data"] as? [String: Any] ?? [:]
     }
@@ -1321,16 +1342,22 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
         do {
             let (data, response) = try await urlSession.data(for: request)
             try Task.checkCancellation()
-            guard let httpResponse = response as? HTTPURLResponse,
-                  (200..<300).contains(httpResponse.statusCode) else {
+            guard let httpResponse = response as? HTTPURLResponse else {
                 throw QQMusicError.invalidResponse
+            }
+            guard (200..<300).contains(httpResponse.statusCode) else {
+                switch httpResponse.statusCode {
+                case 401: throw QQMusicError.credentialExpired(code: 401)
+                case 403: throw QQMusicError.accessDenied(code: 403)
+                default: throw QQMusicError.httpStatus(code: httpResponse.statusCode)
+                }
             }
             guard let json = try JSONSerialization.jsonObject(with: data)
                 as? [String: Any] else {
                 throw QQMusicError.invalidResponse
             }
-            if let code = json["code"] as? Int, code != 0 {
-                throw QQMusicError.server(
+            if let code = Self.int(json["code"]), code != 0, code != 200 {
+                throw QQMusicError.response(
                     code: code,
                     message: json["message"] as? String ?? ""
                 )

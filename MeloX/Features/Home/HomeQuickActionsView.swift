@@ -97,65 +97,123 @@ enum HomeQuickAction: String, CaseIterable, Identifiable {
 }
 
 struct HomeQuickActionsView: View {
-    @Environment(AppSettings.self) private var settings
     @Environment(\.musicShelfLayout) private var layout
     @ScaledMetric(relativeTo: .body) private var compactCardWidth = 230.0
+    @State private var targetedActionID: String?
 
     let activeAction: HomeQuickAction?
     let perform: (HomeQuickAction) -> Void
+    var configuration = HomeLayoutModuleConfiguration(id: "quickActions", cardSize: .compact)
+    var actions = HomeLayoutPreferences().quickActions
+    var editing: HomeLayoutEditing?
 
-    var body: some View {
-        ScrollView(.horizontal) {
-            LazyHStack(alignment: .top, spacing: 16) {
-                ForEach(HomeQuickAction.allCases) { action in
-                    Button {
-                        perform(action)
-                    } label: {
-                        HomeEditorialCard(
-                            eyebrow: action.eyebrow,
-                            title: action.title,
-                            subtitle: action.subtitle,
-                            systemImage: action.systemImage,
-                            colors: action.colors,
-                            isCompact: settings.compactHomeQuickActions
-                        )
-                        .overlay {
-                            if activeAction == action {
-                                ProgressView()
-                                    .controlSize(settings.compactHomeQuickActions ? .regular : .large)
-                                    .padding(settings.compactHomeQuickActions ? 14 : 22)
-                                    .background(.regularMaterial)
-                                    .clipShape(.circle)
-                            }
-                        }
-                    }
-                    .containerRelativeFrame(.horizontal) {
-                        length, _ in
-                        settings.compactHomeQuickActions
-                            ? min(length, compactCardWidth)
-                            : min(length * 0.86, 340)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(activeAction != nil)
-                    .accessibilityHint(accessibilityHint(for: action))
-                    .accessibilityIdentifier("home-action-\(action.id)")
-                }
-            }
-            .scrollTargetLayout()
-        }
-        .contentMargins(.horizontal, layout.horizontalPadding, for: .scrollContent)
-        .scrollIndicators(.hidden)
-        .scrollTargetBehavior(.viewAligned)
+    private var visibleActions: [HomeLayoutQuickActionConfiguration] {
+        actions.filter { $0.isVisible && HomeQuickAction(rawValue: $0.id) != nil }
     }
 
-    private func accessibilityHint(
-        for action: HomeQuickAction
-    ) -> String {
+    var body: some View {
+        if configuration.presentation == .grid {
+            let metrics = MediaCardGridLayout(
+                containerWidth: layout.containerWidth,
+                horizontalPadding: layout.horizontalPadding,
+                minimumItemWidth: configuration.cardSize == .compact ? 170 : 260,
+                spacing: 16
+            )
+            LazyVGrid(columns: metrics.columns, alignment: .leading, spacing: 16) {
+                ForEach(visibleActions) { card($0) }
+            }
+            .padding(.horizontal, layout.horizontalPadding)
+        } else {
+            ScrollView(.horizontal) {
+                LazyHStack(alignment: .top, spacing: 16) {
+                    ForEach(visibleActions) { configuration in
+                        card(configuration)
+                            .containerRelativeFrame(.horizontal) { length, _ in
+                                isCompact(configuration)
+                                    ? min(length, compactCardWidth)
+                                    : min(length * 0.86, 340)
+                            }
+                    }
+                }
+                .scrollTargetLayout()
+            }
+            .contentMargins(.horizontal, layout.horizontalPadding, for: .scrollContent)
+            .scrollIndicators(.hidden)
+            .scrollTargetBehavior(.viewAligned)
+        }
+    }
+
+    @ViewBuilder
+    private func card(_ configuration: HomeLayoutQuickActionConfiguration) -> some View {
+        if let action = HomeQuickAction(rawValue: configuration.id) {
+            Group {
+                if let editing {
+                    Button { editing.editQuickAction(configuration.id) } label: { cardBody(action, configuration: configuration) }
+                        .draggable(HomeLayoutQuickActionDragItem(sessionID: editing.sessionID, id: configuration.id))
+                        .dropDestination(for: HomeLayoutQuickActionDragItem.self) { items, _ in
+                            guard let item = items.first, item.sessionID == editing.sessionID,
+                                  item.id != configuration.id, actions.contains(where: { $0.id == item.id }) else { return false }
+                            editing.moveQuickAction(item.id, configuration.id)
+                            return true
+                        } isTargeted: { isTargeted in
+                            if isTargeted { targetedActionID = configuration.id }
+                            else if targetedActionID == configuration.id { targetedActionID = nil }
+                        }
+                        .overlay(alignment: .topTrailing) {
+                            Image(systemName: "pencil.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(.white)
+                                .shadow(radius: 2)
+                                .padding(8)
+                                .accessibilityHidden(true)
+                        }
+                        .accessibilityLabel(L10n.format("ui.settings.home_layout.edit_action", action.title))
+                        .accessibilityHint("ui.settings.home_layout.action_drag_hint")
+                } else {
+                    Button { perform(action) } label: { cardBody(action, configuration: configuration) }
+                        .disabled(activeAction != nil)
+                        .accessibilityHint(accessibilityHint(for: action))
+                }
+            }
+            .buttonStyle(.plain)
+            .overlay {
+                if targetedActionID == configuration.id {
+                    RoundedRectangle(cornerRadius: 14).stroke(.tint, lineWidth: 3)
+                }
+            }
+            .accessibilityIdentifier(editing == nil ? "home-action-\(action.id)" : "home-layout-action-\(action.id)")
+        }
+    }
+
+    private func isCompact(_ action: HomeLayoutQuickActionConfiguration) -> Bool {
+        (action.cardSize ?? configuration.cardSize) == .compact
+    }
+
+    private func cardBody(_ action: HomeQuickAction, configuration: HomeLayoutQuickActionConfiguration) -> some View {
+        let compact = isCompact(configuration)
+        return HomeEditorialCard(
+            eyebrow: action.eyebrow,
+            title: action.title,
+            subtitle: action.subtitle,
+            systemImage: action.systemImage,
+            colors: action.colors,
+            isCompact: compact
+        )
+        .overlay {
+            if activeAction == action {
+                ProgressView()
+                    .controlSize(compact ? .regular : .large)
+                    .padding(compact ? 14 : 22)
+                    .background(.regularMaterial)
+                    .clipShape(.circle)
+            }
+        }
+    }
+
+    private func accessibilityHint(for action: HomeQuickAction) -> String {
         switch action {
-        case .dailySongs, .hotSongs, .privateRadar:
-            L10n.format("ui.home.action.open_hint", action.title)
-        case .heartMode, .privateRoaming, .similarSongs:
-            L10n.format("ui.home.action.play_hint", action.title)
+        case .dailySongs, .hotSongs, .privateRadar: L10n.format("ui.home.action.open_hint", action.title)
+        case .heartMode, .privateRoaming, .similarSongs: L10n.format("ui.home.action.play_hint", action.title)
         }
     }
 }

@@ -3,17 +3,34 @@ import SwiftUI
 struct AddToPlaylistSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(LibraryStore.self) private var library
+    @Environment(NeteaseAPI.self) private var api
 
-    let song: Song
+    let songs: [Song]
+    var onResult: ((LibrarySongBatchResult) -> Void)?
 
     @State private var showsCreation = false
     @State private var addingToPlaylistID: Playlist.ID?
+    @State private var addedSongIDs: Set<Int> = []
     @State private var errorMessage: String?
+
+    init(song: Song) {
+        songs = [song]
+    }
+
+    init(songs: [Song], onResult: ((LibrarySongBatchResult) -> Void)? = nil) {
+        var seen: Set<Int> = []
+        self.songs = songs.filter { $0.id > 0 && seen.insert($0.id).inserted }
+        self.onResult = onResult
+    }
 
     var body: some View {
         NavigationStack {
             content
-                .navigationTitle("ui.playlists.add_to")
+                .navigationTitle(
+                    songs.count > 1
+                        ? L10n.format("ui.library.edit.add_to_playlist_title", songs.count - addedSongIDs.count)
+                        : L10n.string("ui.playlists.add_to")
+                )
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
@@ -24,6 +41,7 @@ struct AddToPlaylistSheet: View {
                         Button("ui.common.cancel") {
                             dismiss()
                         }
+                        .disabled(addingToPlaylistID != nil)
                     }
                 }
         }
@@ -122,16 +140,20 @@ struct AddToPlaylistSheet: View {
 
     private func addSong(to playlist: Playlist) async {
         guard addingToPlaylistID == nil else { return }
+        let remaining = songs.filter { !addedSongIDs.contains($0.id) }
+        guard !remaining.isEmpty else { return }
+        let scope = api.accountScope
         addingToPlaylistID = playlist.id
         defer { addingToPlaylistID = nil }
 
-        do {
-            try await library.add(song: song, to: playlist)
+        let result = await library.add(songs: remaining, to: playlist)
+        guard api.accountScope == scope else { return }
+        addedSongIDs.formUnion(result.succeededSongIDs)
+        onResult?(result)
+        if result.isComplete {
             dismiss()
-        } catch is CancellationError {
-            return
-        } catch {
-            errorMessage = error.localizedDescription
+        } else {
+            errorMessage = result.errorMessage
         }
     }
 }

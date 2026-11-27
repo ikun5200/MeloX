@@ -40,6 +40,12 @@ struct GeneralSettingsView: View {
                     }
                 }
 
+                NavigationLink {
+                    HomeLayoutSettingsView()
+                } label: {
+                    Label("ui.settings.home_layout.title", systemImage: "rectangle.3.group")
+                }
+
                 Toggle(
                     "ui.settings.general.compact_home_actions",
                     isOn: $settings.compactHomeQuickActions

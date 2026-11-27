@@ -9,6 +9,7 @@ enum SettingsRoute: Hashable {
     case systemPlayback
     case general
     case tabLayout
+    case homeLayout
     case contentFeatures
     case content
     case sources
@@ -145,6 +146,13 @@ enum SettingsCatalog {
         SettingsCatalogSection(
             title: L10n.string("ui.settings.catalog.interface.section"),
             items: [
+                SettingsCatalogItem(
+                    route: .homeLayout,
+                    title: L10n.string("ui.settings.home_layout.title"),
+                    subtitle: L10n.string("ui.settings.home_layout.subtitle"),
+                    systemImage: "rectangle.3.group",
+                    keywords: L10n.keywords("ui.settings.home_layout.keywords")
+                ),
                 SettingsCatalogItem(
                     route: .tabLayout,
                     title: L10n.string("ui.settings.catalog.tab_layout.title"),

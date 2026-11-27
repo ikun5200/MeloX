@@ -4,41 +4,31 @@ import Observation
 @MainActor
 @Observable
 final class MusicCollectionDownloadCoordinator {
-    private(set) var isSelecting = false
-    private(set) var selectedSongIDs: Set<Int> = []
+    private var selection = MusicCollectionSelection()
+    var isSelecting: Bool { selection.isSelecting }
+    var selectedSongIDs: Set<Int> { selection.selectedSongIDs }
     private(set) var isPreparing = false
     private(set) var preparingSongCount = 0
     private(set) var errorMessage: String?
 
     func beginSelection() {
-        selectedSongIDs.removeAll()
-        isSelecting = true
+        selection.beginSelection()
     }
 
     func finishSelection() {
-        selectedSongIDs.removeAll()
-        isSelecting = false
+        selection.finishSelection()
     }
 
     func toggleSelection(songID: Int) {
-        if selectedSongIDs.contains(songID) {
-            selectedSongIDs.remove(songID)
-        } else {
-            selectedSongIDs.insert(songID)
-        }
+        selection.toggleSelection(songID: songID)
     }
 
     func toggleAll(songIDs: Set<Int>) {
-        guard !songIDs.isEmpty else { return }
-        if songIDs.isSubset(of: selectedSongIDs) {
-            selectedSongIDs.subtract(songIDs)
-        } else {
-            selectedSongIDs.formUnion(songIDs)
-        }
+        selection.toggleAll(songIDs: songIDs)
     }
 
     func retainSelection(in songIDs: Set<Int>) {
-        selectedSongIDs.formIntersection(songIDs)
+        selection.retainSelection(in: songIDs)
     }
 
     func clearError() {

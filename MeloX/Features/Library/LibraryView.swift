@@ -32,6 +32,21 @@ struct LibraryView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if api.requiresQQRelogin {
+                HStack(spacing: 10) {
+                    Image(systemName: "person.crop.circle.badge.exclamationmark")
+                    Text("ui.error.qq.login_expired")
+                        .font(.callout)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button("ui.qq_account.login_again") { showsLogin = true }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("library-login-again")
+                }
+                .padding(12)
+                .background(.thinMaterial, in: .rect(cornerRadius: 12))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            }
             if !showsNavigationTitle, fixedPage == nil, availablePages.count > 1 {
                 Group {
                     if availablePages.count > 4, horizontalSizeClass == .compact {
@@ -132,6 +147,12 @@ struct LibraryView: View {
                 }
             )
         ) {
+            if api.requiresQQRelogin {
+                Button("ui.qq_account.login_again") {
+                    library.clearError()
+                    showsLogin = true
+                }
+            }
             Button("ui.common.ok", role: .cancel) {
                 library.clearError()
             }

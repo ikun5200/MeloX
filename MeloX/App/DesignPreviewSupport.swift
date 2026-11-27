@@ -8,11 +8,7 @@ enum MeloXDesignPreview {
         ProcessInfo.processInfo.environment["MELOX_UI_PREVIEW"] == "1"
     }
 
-    static let covers = [
-        "https://p2.music.126.net/HXfXIIBCk5w96MiY1Wdsqw==/109951171836610847.jpg",
-        "https://p2.music.126.net/ltPnu_JI1o70hz1INwzFYg==/109951166557803274.jpg",
-        "https://p2.music.126.net/e5cvcdgeosDKTDrkTfZXnQ==/109951166155165682.jpg",
-    ]
+    static let covers: [String?] = [nil, nil, nil]
 
     static var songs: [Song] {
         let names = ["此刻的音乐", "午后漫游", "夜色与旋律", "重新出发", "晴空", "晚安电台"]
@@ -47,8 +43,8 @@ enum MeloXDesignPreview {
         return Playlist(
             id: 3778678,
             name: "热歌榜",
-            coverURLString: "https://p1.music.126.net/0SUEG8yDACfx0Bw2MYFv4Q==/109951170048519512.jpg",
-            playlistDescription: "云音乐热歌榜，每日更新。",
+            coverURLString: nil,
+            playlistDescription: "MeloX 界面测试榜单。",
             trackCount: tracks.count,
             updateFrequency: "每日更新",
             toplistType: "hot",

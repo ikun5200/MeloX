@@ -3,8 +3,9 @@ import Foundation
 extension NeteaseAPI {
     func subscribedAlbums(limit: Int = 2_000) async throws -> [Album] {
         if isUsingSourceResolver {
-            return try await qq.favoriteAlbums(limit: limit)
-                .map(QQMusicMapper.album)
+            return try await withQQAccountRead { client in
+                try await client.favoriteAlbums(limit: limit)
+            }.map(QQMusicMapper.album)
         }
         // @neteaseapireborn/api/module/album_sublist.js uses this original
         // NetEase WEAPI endpoint with limit, offset, and total.

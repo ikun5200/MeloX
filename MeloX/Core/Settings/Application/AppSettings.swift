@@ -265,6 +265,7 @@ final class AppSettings {
             "recognizesClipboardLinksOnLaunch"
         static let checksUpdatesOnLaunch = "checksUpdatesOnLaunch"
         static let compactHomeQuickActions = "compactHomeQuickActions"
+        static let homeLayout = "homeLayout.v1"
         static let automaticallyCachesPageContent = "automaticallyCachesPageContent"
         static let automaticallyCachesFrequentlyPlayedSongs = "automaticallyCachesFrequentlyPlayedSongs"
         static let automaticCachePlaybackThreshold = "automaticCachePlaybackThreshold"
@@ -294,12 +295,9 @@ final class AppSettings {
         qqCredential.accountScopeID
     }
 
-    /// 页面缓存和账号级数据使用的稳定身份。QQ 登录后使用不可逆的账号指纹，
-    /// 避免把票据写入缓存目录或日志。
+    /// 页面缓存和账号偏好使用稳定身份，续期不更换作用域，也不包含登录票据。
     var accountCacheScope: String {
-        qqCredential.isValid
-            ? "qq:\(qqCredential.accountScopeID)"
-            : cookie
+        qqCredential.isValid ? qqCredential.accountScopeID : cookie
     }
 
     func saveQQCredential(_ credential: QQCredential) {
@@ -320,9 +318,33 @@ final class AppSettings {
         }
     }
 
+    private(set) var homeLayout = HomeLayoutPreferences()
+
+    func setHomeLayout(_ layout: HomeLayoutPreferences) {
+        let normalized = layout.normalized()
+        guard normalized != homeLayout || defaults.data(forKey: Key.homeLayout) == nil else { return }
+        homeLayout = normalized
+        if let data = try? JSONEncoder().encode(normalized) {
+            defaults.set(data, forKey: Key.homeLayout)
+        }
+        if compactHomeQuickActions != normalized.usesCompactQuickActions {
+            compactHomeQuickActions = normalized.usesCompactQuickActions
+        }
+    }
+
+    func resetHomeLayout() {
+        setHomeLayout(HomeLayoutPreferences())
+    }
+
     var compactHomeQuickActions: Bool {
         didSet {
             defaults.set(compactHomeQuickActions, forKey: Key.compactHomeQuickActions)
+            var layout = homeLayout
+            if var module = layout.module(HomeLayoutModule.quickActions.id) {
+                module.cardSize = compactHomeQuickActions ? .compact : .standard
+                layout.updateModule(module)
+                setHomeLayout(layout)
+            }
         }
     }
 
@@ -1939,9 +1961,12 @@ final class AppSettings {
             forKey: Key.recognizesClipboardLinksOnLaunch
         ) as? Bool ?? Self.defaultRecognizesClipboardLinksOnLaunch
         checksUpdatesOnLaunch = defaults.object(forKey: Key.checksUpdatesOnLaunch) as? Bool ?? true
-        compactHomeQuickActions = defaults.object(
-            forKey: Key.compactHomeQuickActions
-        ) as? Bool ?? true
+        let compactHomeActions = defaults.object(forKey: Key.compactHomeQuickActions) as? Bool ?? true
+        let storedHomeLayout = defaults.data(forKey: Key.homeLayout).flatMap {
+            try? JSONDecoder().decode(HomeLayoutPreferences.self, from: $0)
+        } ?? HomeLayoutPreferences(compactQuickActions: compactHomeActions)
+        homeLayout = storedHomeLayout.normalized()
+        compactHomeQuickActions = storedHomeLayout.usesCompactQuickActions
         automaticallyCachesPageContent = defaults.object(
             forKey: Key.automaticallyCachesPageContent
         ) as? Bool ?? true

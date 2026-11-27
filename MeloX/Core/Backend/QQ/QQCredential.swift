@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 /// QQ 音乐登录凭证。
@@ -43,19 +42,24 @@ nonisolated struct QQCredential: Codable, Equatable, Sendable {
     }
 
     var isExpired: Bool {
-        guard musicKeyCreateTime > 0, keyExpiresIn > 0 else {
-            return false
-        }
-        return Int(Date().timeIntervalSince1970)
-            >= musicKeyCreateTime + keyExpiresIn
+        isExpired(at: Date())
     }
 
-    /// 账号级缓存作用域。用于替代旧实现里的 `SHA256(cookie)`。
+    func isExpired(at date: Date) -> Bool {
+        let now = Int(date.timeIntervalSince1970)
+        if expiredAt > 0 {
+            let expiry = expiredAt > 10_000_000_000 ? expiredAt / 1_000 : expiredAt
+            if now >= expiry { return true }
+        }
+        guard musicKeyCreateTime > 0, keyExpiresIn > 0 else { return false }
+        let expiry = musicKeyCreateTime.addingReportingOverflow(keyExpiresIn)
+        return !expiry.overflow && now >= expiry.partialValue
+    }
+
+    /// A credential renewal changes the key, not the listener's identity.
     var accountScopeID: String {
         guard isValid else { return "" }
-        let material = "\(musicID):\(musicKey)"
-        let digest = SHA256.hash(data: Data(material.utf8))
-        return digest.map { String(format: "%02x", $0) }.joined()
+        return "qq:\(musicID)"
     }
 
     var maskedMusicKey: String {

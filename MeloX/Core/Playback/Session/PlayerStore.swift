@@ -1207,21 +1207,31 @@ final class PlayerStore {
     }
 
     func addToPlaybackQueue(_ song: Song) {
+        addToPlaybackQueue([song])
+    }
+
+    func addToPlaybackQueue(_ songs: [Song]) {
+        guard !songs.isEmpty else { return }
         cancelNextPreparation()
-        playbackQueue.append(song)
+        playbackQueue.append(contentsOf: songs)
         onListenTogetherQueueEdit?()
         persistSnapshot()
         prepareNextIfNeeded()
     }
 
     func playNext(_ song: Song) async {
+        await playNext([song])
+    }
+
+    func playNext(_ songs: [Song]) async {
+        guard !songs.isEmpty else { return }
         guard currentSong != nil, !queue.isEmpty else {
-            await play(song)
+            await playAll(songs)
             return
         }
 
         cancelNextPreparation()
-        playbackQueue.insertNext(song)
+        playbackQueue.insertNext(contentsOf: songs)
         onListenTogetherQueueEdit?()
         persistSnapshot()
         prepareNextIfNeeded()
