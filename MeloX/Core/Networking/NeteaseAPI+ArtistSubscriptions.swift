@@ -1,7 +1,7 @@
 import Foundation
 
 extension NeteaseAPI {
-    func subscribedArtists(limit: Int = 2_000) async throws -> [Artist] {
+    func subscribedArtists(limit: Int = 500) async throws -> [Artist] {
         if isUsingSourceResolver {
             return try await withQQAccountRead { client in
                 try await client.followedArtists(limit: limit)
