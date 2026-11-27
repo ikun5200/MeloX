@@ -833,6 +833,7 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
         while artists.count < limit {
             try Task.checkCancellation()
             let size = min(50, limit - artists.count)
+            rigTrace("qq", "followedArtists request from=\(offset) size=\(size)")
             let data = try await authenticatedCall(
                 module: "music.concern.RelationList",
                 method: "GetFollowSingerList",
@@ -844,6 +845,7 @@ nonisolated struct QQMusicClient: @unchecked Sendable {
             guard items.isEmpty || !page.isEmpty else { throw QQMusicError.invalidResponse }
             let previousCount = artists.count
             artists.append(contentsOf: page.filter { seen.insert($0.id).inserted })
+            rigTrace("qq", "followedArtists from=\(offset) size=\(size) items=\(items.count) unique=\(artists.count) total=\(Self.int(data["Total"] ?? data["total"]) ?? -1)")
             let nextOffset = offset + items.count
             let total = Self.int(data["Total"] ?? data["total"] ?? data["TotalNum"])
             let hasMore = Self.int(data["HasMore"] ?? data["hasMore"] ?? data["hasmore"])

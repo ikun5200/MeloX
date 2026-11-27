@@ -296,9 +296,11 @@ final class LibraryStore {
                 let artists = try await api.subscribedArtists()
                 guard isCurrentRefresh(cookie) else { return }
                 favoriteArtists = artists
+                rigTrace("library", "artists=\(artists.count)")
             } catch is CancellationError {
                 return
             } catch {
+                rigTrace("library", "artists failed: \(error.localizedDescription)")
                 partialFailures.append(
                     L10n.format("ui.library.error.favorite_artists", error.localizedDescription)
                 )
