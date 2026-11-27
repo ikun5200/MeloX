@@ -1272,6 +1272,8 @@
 "ui.settings.home_layout.move_down" = "后移";
 "ui.settings.home_layout.hidden_count" = "已隐藏 %d 项";
 "ui.settings.home_layout.restore_default" = "恢复默认排版";
+"ui.settings.home_layout.restore_title" = "恢复默认排版？";
+"ui.settings.home_layout.restore_message" = "预览会回到默认顺序和默认样式，仍需保存才会应用到首页。";
 "ui.settings.home_layout.discard_title" = "放弃未保存的排版？";
 "ui.settings.home_layout.discard_message" = "当前预览尚未应用到首页。你可以继续编辑，或放弃这些更改。";
 "ui.settings.home_layout.discard" = "放弃更改";

@@ -1272,6 +1272,8 @@
 "ui.settings.home_layout.move_down" = "Move Later";
 "ui.settings.home_layout.hidden_count" = "%d Hidden Items";
 "ui.settings.home_layout.restore_default" = "Restore Default Layout";
+"ui.settings.home_layout.restore_title" = "Restore Default Layout?";
+"ui.settings.home_layout.restore_message" = "The preview returns to the default order and styles. You still need to save for it to apply.";
 "ui.settings.home_layout.discard_title" = "Discard Unsaved Layout?";
 "ui.settings.home_layout.discard_message" = "This preview has not been applied. Keep editing or discard your changes.";
 "ui.settings.home_layout.discard" = "Discard Changes";

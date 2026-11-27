@@ -11,6 +11,7 @@ struct HomeLayoutSettingsView: View {
     @State private var sections: [HomeRecommendationSection] = []
     @State private var inspector: HomeLayoutInspector?
     @State private var showsDiscardConfirmation = false
+    @State private var showsResetConfirmation = false
     @State private var showsHiddenItems = false
     @State private var hasCachedPreview = false
     @State private var activity = 0
@@ -48,6 +49,13 @@ struct HomeLayoutSettingsView: View {
                         onEdit: { draft = HomeLayoutPreferences() }
                     )
                     .accessibilityIdentifier("home-layout-preview")
+
+                    Button("ui.settings.home_layout.restore_default", systemImage: "arrow.counterclockwise") {
+                        showsResetConfirmation = true
+                    }
+                    .buttonStyle(.bordered)
+                    .padding(.horizontal, 16)
+                    .accessibilityIdentifier("home-layout-restore")
                 }
             }
             .padding(.top, 16)
@@ -61,17 +69,6 @@ struct HomeLayoutSettingsView: View {
             ToolbarItem(placement: .cancellationAction) {
                 Button("ui.common.cancel", action: requestDismiss)
                     .accessibilityIdentifier("home-layout-cancel")
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button("ui.settings.home_layout.restore_default", systemImage: "arrow.counterclockwise") {
-                        withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) {
-                            draft = HomeLayoutPreferences()
-                        }
-                    }
-                } label: { Image(systemName: "ellipsis.circle") }
-                .accessibilityLabel("ui.common.more")
-                .accessibilityIdentifier("home-layout-more")
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("ui.common.save") {
@@ -106,8 +103,17 @@ struct HomeLayoutSettingsView: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
-        .confirmationDialog("ui.settings.home_layout.discard_title", isPresented: $showsDiscardConfirmation, titleVisibility: .visible) {
-            Button("ui.settings.home_layout.discard", role: .destructive) {
+        .confirmationDialog("ui.settings.home_layout.restore_title", isPresented: $showsResetConfirmation, titleVisibility: .visible) {
+            Button("ui.settings.home_layout.restore_default", role: .destructive) {
+                withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) {
+                    draft = HomeLayoutPreferences()
+                }
+            }
+            Button("ui.common.cancel", role: .cancel) {}
+        } message: {
+            Text("ui.settings.home_layout.restore_message")
+        }
+        .confirmationDialog("ui.settings.home_layout.discard_title", isPresented: $showsDiscardConfirmation, titleVisibility: .visible) {            Button("ui.settings.home_layout.discard", role: .destructive) {
                 draft = initialLayout ?? HomeLayoutPreferences()
                 dismiss()
             }
