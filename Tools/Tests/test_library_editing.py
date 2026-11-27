@@ -25,6 +25,9 @@ nonisolated enum L10n {
     static func string(_ key: String) -> String { key }
     static func format(_ key: String, _ values: CVarArg...) -> String { key }
 }
+
+@inline(__always)
+func rigTrace(_ scope: String, _ message: @autoclosure () -> String) {}
 struct Song: Codable, Equatable, Sendable { let id: Int; var name: String = "Song" }
 struct Artist: Codable, Sendable { let id: Int }
 struct Album: Codable, Sendable { let id: Int }

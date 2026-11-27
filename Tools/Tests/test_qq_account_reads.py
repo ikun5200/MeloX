@@ -29,6 +29,9 @@ nonisolated enum L10n {
     static func joined(_ values: [String], separatorKey: String) -> String { values.joined(separator: ", ") }
 }
 
+@inline(__always)
+func rigTrace(_ scope: String, _ message: @autoclosure () -> String) {}
+
 final class AccountFixture: @unchecked Sendable {
     private let lock = NSLock()
     private var rootFailure = false
