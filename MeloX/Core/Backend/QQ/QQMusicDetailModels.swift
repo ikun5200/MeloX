@@ -13,6 +13,7 @@ nonisolated struct QQPlaylistDetail: Sendable {
     let songs: [QQSearchSong]
     let total: Int
     let hasMore: Bool
+    var nextOffset: Int? = nil
 }
 
 nonisolated struct QQAlbumDetail: Sendable {

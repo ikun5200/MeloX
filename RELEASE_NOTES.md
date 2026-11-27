@@ -4,6 +4,11 @@
 
 ### 简体中文
 
+- 2.1.5：设置新增「首页排版」，在预览里直接拖动栏目和快捷入口排序，调整横向卡片/网格、卡片大小和显示隐藏，保存后才应用到首页。
+- 收藏歌曲支持多选批量加入歌单、加入播放队列、下一首播放、下载和取消收藏；取消收藏先确认，失败的项目保留选中并提示。
+- 收藏歌曲支持调整顺序，排序按账号保存在本机，重新登录仍保留，不改变 QQ 客户端的排序。
+- 收藏列表不再只读取前一批歌曲，会继续分页读取；未完整读取前不会把已加载内容当成全部收藏。
+- 修复音乐库歌手列表报「音乐服务返回了错误（1,000）」：现在会识别登录过期并自动续期一次；续期失败时保留已有音乐库内容，并直接提供「重新登录」。
 - 2.1.4：播放页底部中间的按钮改为隔空投送（AirPlay），可直接把播放送到其他设备；悬浮歌词开关移入封面右上角的「…」菜单。
 - 调节进度条或音量后，底部控制面板会在几秒后自动淡出，轻点面板区域即可重新显示。
 - 2.1.3：新增「播放诊断」（设置 → 关于 → 开发者选项 → 播放诊断）。可查看当前歌曲与音质证据、音源实际交付的格式，以及两路播放器的采样率、声道、缓冲、音频会话与输出路由，支持一键复制全文。
@@ -32,6 +37,11 @@
 
 ### English
 
+- 2.1.5 adds Homepage Layout in Settings: drag sections and shortcuts directly in the preview, switch shelves to grids, change card size, and hide or restore items; nothing applies until you save.
+- Favorite songs now support batch selection for playlists, the queue, Play Next, downloads, and removal from favorites. Removal asks first and keeps failed items selected with a clear report.
+- Favorite songs can be reordered. The order is stored per account on this device and survives signing in again; it does not change the order in the QQ client.
+- The favorites list keeps paging instead of stopping at the first batch, and never presents partially loaded content as the whole library.
+- Fixed the artist list failing with “the music service returned error (1,000)”. An expired sign-in is now detected and renewed once; if renewal fails, existing library content stays and a Sign In Again action is offered.
 - 2.1.4 turns the middle button on the player's bottom row into AirPlay, so playback can be sent to other devices; the Floating Lyrics toggle moved into the “…” menu beside the artwork.
 - After adjusting the progress or the volume, the bottom panel fades out a few seconds later; tapping the panel brings it back.
 - 2.1.3 adds Playback Diagnostics (Settings → About → Developer Options): the current song, per-tier evidence, the stream a source delivered, both decks' sample rate and channels, and the audio session and output route, with a copy-all button.

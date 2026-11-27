@@ -24,6 +24,20 @@ final class LibraryStore {
     private(set) var subscribedPodcastsLoadMoreError: String?
     private(set) var phase: LoadingPhase = .loaded
     private(set) var errorMessage: String?
+    private(set) var favoriteOrderErrorMessage: String?
+    private(set) var pendingFavoriteSongIDs: Set<Int> = []
+    private(set) var isPerformingFavoriteBatch = false
+    private var favoriteSongOrder: FavoriteSongOrder?
+    private var qqFavoriteSongsHaveMore = false
+
+    @ObservationIgnored
+    private let orderStore: FavoriteSongOrderStore
+
+    @ObservationIgnored
+    private var favoriteContentRevision: UInt64 = 0
+
+    @ObservationIgnored
+    private var favoriteBatchID: UUID?
 
     @ObservationIgnored
     private let api: NeteaseAPI
@@ -64,9 +78,48 @@ final class LibraryStore {
     @ObservationIgnored
     private var subscribedPodcastPageLoadID: UUID?
 
-    init(api: NeteaseAPI, settings: AppSettings) {
+    init(
+        api: NeteaseAPI,
+        settings: AppSettings,
+        orderStore: FavoriteSongOrderStore = FavoriteSongOrderStore()
+    ) {
         self.api = api
         self.settings = settings
+        self.orderStore = orderStore
+    }
+
+    var orderedFavoriteSongs: [Song] {
+        var songsByID: [Int: Song] = [:]
+        for song in favoriteSongs where songsByID[song.id] == nil {
+            songsByID[song.id] = song
+        }
+        let remoteIDs = FavoriteSongOrder.uniqueIDs(favoriteSongs.map(\.id))
+        let orderedIDs = favoriteSongOrder?.applying(to: remoteIDs) ?? remoteIDs
+        return orderedIDs.compactMap { songsByID[$0] }
+    }
+
+    var isUpdatingFavoriteSongs: Bool {
+        isPerformingFavoriteBatch || !pendingFavoriteSongIDs.isEmpty
+    }
+
+    func saveFavoriteSongOrder(_ songIDs: [Int], accountScope: String) throws {
+        guard isLoggedIn, api.accountScope == accountScope,
+              loadedCookie == accountScope else { throw CancellationError() }
+        guard !hasMoreFavoriteSongs else { throw FavoriteSongOrderError.incompleteLibrary }
+        let order = FavoriteSongOrder(songIDs: songIDs)
+            .reconciled(with: favoriteSongIDs, isComplete: true)
+        do {
+            try orderStore.save(order, accountScope: accountScope)
+            favoriteSongOrder = order
+            favoriteOrderErrorMessage = nil
+        } catch {
+            favoriteOrderErrorMessage = L10n.format("ui.library.edit.order_save_failed", error.localizedDescription)
+            throw error
+        }
+    }
+
+    func clearFavoriteOrderError() {
+        favoriteOrderErrorMessage = nil
     }
 
     var isLoggedIn: Bool {
@@ -79,7 +132,9 @@ final class LibraryStore {
     }
 
     var hasMoreFavoriteSongs: Bool {
-        favoriteSongsNextOffset < favoriteSongTotalCount
+        api.isUsingSourceResolver
+            ? qqFavoriteSongsHaveMore
+            : favoriteSongsNextOffset < favoriteSongTotalCount
     }
 
     var canStartHeartMode: Bool {
@@ -177,6 +232,7 @@ final class LibraryStore {
             }
             guard isCurrentRefresh(cookie) else { return }
         }
+        loadFavoriteSongOrder(accountScope: cookie)
         phase = .loading
         errorMessage = nil
         favoriteSongsLoadMoreError = nil
@@ -249,15 +305,25 @@ final class LibraryStore {
             }
 
             do {
+                let revision = favoriteContentRevision
                 if api.isUsingSourceResolver {
-                    let songs = try await api.sourceLikedSongs()
+                    let page = try await api.sourceLikedSongsPage(limit: favoriteSongPageSize)
                     guard isCurrentRefresh(cookie) else { return }
-                    favoriteSongIDs = songs.map(\.id)
-                    favoriteSongIDSet = Set(favoriteSongIDs)
-                    favoriteSongTotalCount = favoriteSongIDs.count
-                    favoriteSongs = songs
-                    favoriteSongsNextOffset = songs.count
-                    favoriteSongsLoadMoreError = nil
+                    if favoriteContentRevision == revision {
+                        favoriteSongIDs = FavoriteSongOrder.uniqueIDs(page.songs.map(\.id))
+                        favoriteSongIDSet = Set(favoriteSongIDs)
+                        favoriteSongTotalCount = page.totalCount
+                        favoriteSongs = uniqueFavoriteSongs(page.songs)
+                        favoriteSongsNextOffset = page.nextOffset
+                        qqFavoriteSongsHaveMore = page.hasMore
+                        favoriteSongsLoadMoreError = nil
+                        reconcileFavoriteSongOrder(isComplete: !page.hasMore)
+                        await loadRemainingFavoriteSongs()
+                        guard isCurrentRefresh(cookie) else { return }
+                        if let error = favoriteSongsLoadMoreError {
+                            partialFailures.append(L10n.format("ui.library.error.favorite_songs", error))
+                        }
+                    }
                 } else {
                     let loadedSongIDs = try await api.likedSongIDs(
                         userID: loadedProfile.id,
@@ -272,12 +338,15 @@ final class LibraryStore {
                     guard loadedSongIDs.isEmpty || !firstPage.songs.isEmpty else {
                         throw APIError.invalidResponse
                     }
-                    favoriteSongIDs = loadedSongIDs
-                    favoriteSongIDSet = Set(loadedSongIDs)
-                    favoriteSongTotalCount = loadedSongIDs.count
-                    favoriteSongs = firstPage.songs
-                    favoriteSongsNextOffset = firstPage.nextOffset
-                    favoriteSongsLoadMoreError = nil
+                    if favoriteContentRevision == revision {
+                        favoriteSongIDs = loadedSongIDs
+                        favoriteSongIDSet = Set(loadedSongIDs)
+                        favoriteSongTotalCount = loadedSongIDs.count
+                        favoriteSongs = firstPage.songs
+                        favoriteSongsNextOffset = firstPage.nextOffset
+                        favoriteSongsLoadMoreError = nil
+                        reconcileFavoriteSongOrder(isComplete: true)
+                    }
                 }
             } catch is CancellationError {
                 return
@@ -343,12 +412,16 @@ final class LibraryStore {
 
         let requestedOffset = favoriteSongsNextOffset
         let requestedIDs = favoriteSongIDs
+        let requestedScope = api.accountScope
+        let requestedRevision = favoriteContentRevision
         let loadID = UUID()
         let loadTask = Task { @MainActor [weak self] in
             guard let self else { return }
             await self.loadFavoriteSongsPage(
                 ids: requestedIDs,
-                offset: requestedOffset
+                offset: requestedOffset,
+                accountScope: requestedScope,
+                revision: requestedRevision
             )
         }
         favoriteSongPageLoadID = loadID
@@ -363,6 +436,18 @@ final class LibraryStore {
 
     func loadFavoriteSongForLocation(_ songID: Int) async -> Bool {
         if favoriteSongs.contains(where: { $0.id == songID }) { return true }
+        if api.isUsingSourceResolver {
+            let scope = api.accountScope
+            while hasMoreFavoriteSongs {
+                guard !Task.isCancelled, api.accountScope == scope else { return false }
+                let previousOffset = favoriteSongsNextOffset
+                await loadMoreFavoriteSongs()
+                guard api.accountScope == scope else { return false }
+                if favoriteSongs.contains(where: { $0.id == songID }) { return true }
+                guard favoriteSongsNextOffset > previousOffset else { return false }
+            }
+            return false
+        }
         let requestedIDs = favoriteSongIDs
         guard let index = requestedIDs.firstIndex(of: songID) else { return false }
 
@@ -387,9 +472,16 @@ final class LibraryStore {
     }
 
     func favoriteSongsForPlayback() async throws -> [Song] {
-        if let favoriteSongPageLoadTask {
-            await favoriteSongPageLoadTask.value
+        let scope = api.accountScope
+        await loadRemainingFavoriteSongs()
+        try Task.checkCancellation()
+        guard api.accountScope == scope else { throw CancellationError() }
+        guard !hasMoreFavoriteSongs else {
+            throw LibraryOperationError.favoriteSongsIncomplete(
+                favoriteSongsLoadMoreError ?? L10n.string("ui.library.complete_song_list_failed")
+            )
         }
+        if api.isUsingSourceResolver { return orderedFavoriteSongs }
 
         let requestedIDs = favoriteSongIDs
         let songs = try await api.songDetailsCollection(
@@ -397,46 +489,65 @@ final class LibraryStore {
             prefetched: favoriteSongs
         )
         try Task.checkCancellation()
-
-        if favoriteSongIDs == requestedIDs {
-            favoriteSongs = songs
-            favoriteSongsNextOffset = requestedIDs.count
-            favoriteSongsLoadMoreError = nil
+        guard api.accountScope == scope, favoriteSongIDs == requestedIDs else {
+            throw CancellationError()
         }
-        return songs
+        favoriteSongs = songs
+        favoriteSongsNextOffset = requestedIDs.count
+        favoriteSongsLoadMoreError = nil
+        return orderedFavoriteSongs
     }
 
     private func loadFavoriteSongsPage(
         ids requestedIDs: [Int],
-        offset requestedOffset: Int
+        offset requestedOffset: Int,
+        accountScope: String,
+        revision: UInt64
     ) async {
+        guard api.accountScope == accountScope, favoriteContentRevision == revision else { return }
         isLoadingMoreFavoriteSongs = true
         favoriteSongsLoadMoreError = nil
-        defer { isLoadingMoreFavoriteSongs = false }
+        defer {
+            if api.accountScope == accountScope, favoriteContentRevision == revision {
+                isLoadingMoreFavoriteSongs = false
+            }
+        }
 
         do {
-            let page = try await api.songDetailsPage(
-                ids: requestedIDs,
-                offset: requestedOffset,
-                limit: favoriteSongPageSize
-            )
+            let page = if api.isUsingSourceResolver {
+                try await api.sourceLikedSongsPage(offset: requestedOffset, limit: favoriteSongPageSize)
+            } else {
+                try await api.songDetailsPage(
+                    ids: requestedIDs,
+                    offset: requestedOffset,
+                    limit: favoriteSongPageSize
+                )
+            }
             try Task.checkCancellation()
-            guard favoriteSongIDs == requestedIDs,
-                  favoriteSongsNextOffset == requestedOffset else {
-                return
+            guard api.accountScope == accountScope,
+                  favoriteContentRevision == revision,
+                  favoriteSongIDs == requestedIDs,
+                  favoriteSongsNextOffset == requestedOffset else { return }
+            guard page.nextOffset > requestedOffset || !page.hasMore else {
+                throw APIError.invalidResponse
             }
 
             var loadedIDs = Set(favoriteSongs.map(\.id))
-            favoriteSongs.append(
-                contentsOf: page.songs.filter {
-                    loadedIDs.insert($0.id).inserted
-                }
-            )
+            let addedSongs = page.songs.filter { $0.id > 0 && loadedIDs.insert($0.id).inserted }
+            favoriteSongs.append(contentsOf: addedSongs)
+            if api.isUsingSourceResolver {
+                favoriteSongIDs.append(contentsOf: addedSongs.map(\.id))
+                favoriteSongIDSet.formUnion(addedSongs.map(\.id))
+                favoriteSongTotalCount = page.totalCount
+                qqFavoriteSongsHaveMore = page.hasMore
+            }
             favoriteSongsNextOffset = page.nextOffset
+            reconcileFavoriteSongOrder(isComplete: !hasMoreFavoriteSongs)
             await persistContent()
         } catch is CancellationError {
             return
         } catch {
+            guard api.accountScope == accountScope, favoriteContentRevision == revision else { return }
             favoriteSongsLoadMoreError = error.localizedDescription
         }
     }
@@ -503,18 +614,54 @@ final class LibraryStore {
             errorMessage = APIError.notLoggedIn.localizedDescription
             return
         }
-
-        let wasLiked = contains(song: song)
-        setLocalSong(song, isLiked: !wasLiked)
+        guard !isPerformingFavoriteBatch, !pendingFavoriteSongIDs.contains(song.id) else { return }
+        let scope = api.accountScope
+        let desiredState = !contains(song: song)
+        pendingFavoriteSongIDs.insert(song.id)
 
         Task { @MainActor [weak self] in
             guard let self else { return }
+            defer {
+                if self.api.accountScope == scope {
+                    self.pendingFavoriteSongIDs.remove(song.id)
+                }
+            }
             do {
-                try await self.api.setSongLiked(id: song.id, isLiked: !wasLiked)
+                try await self.api.setSongLiked(id: song.id, isLiked: desiredState)
+                guard self.api.accountScope == scope else { return }
+                // Change membership only after QQ confirms it. A failed
+                // cancellation therefore leaves the song at its exact position.
+                self.setLocalSong(song, isLiked: desiredState)
+            } catch is CancellationError {
+                return
             } catch {
-                self.setLocalSong(song, isLiked: wasLiked)
+                guard self.api.accountScope == scope else { return }
                 self.errorMessage = error.localizedDescription
             }
+        }
+    }
+
+    func removeFavoriteSongs(_ songs: [Song]) async -> LibrarySongBatchResult {
+        let songs = uniqueFavoriteSongs(songs)
+        guard !isUpdatingFavoriteSongs else {
+            return failedBatch(songs, message: L10n.string("ui.library.edit.operation_in_progress"))
+        }
+        let scope = api.accountScope
+        let operationID = UUID()
+        favoriteBatchID = operationID
+        isPerformingFavoriteBatch = true
+        pendingFavoriteSongIDs.formUnion(songs.map(\.id))
+        defer {
+            if favoriteBatchID == operationID {
+                pendingFavoriteSongIDs.subtract(songs.map(\.id))
+                isPerformingFavoriteBatch = false
+                favoriteBatchID = nil
+            }
+        }
+        return await performSongBatch(songs) { song in
+            try await self.api.setSongLiked(id: song.id, isLiked: false)
+            guard self.api.accountScope == scope else { throw CancellationError() }
+            self.setLocalSong(song, isLiked: false)
         }
     }
 
@@ -655,6 +802,57 @@ final class LibraryStore {
         )
     }
 
+    func add(songs: [Song], to playlist: Playlist) async -> LibrarySongBatchResult {
+        guard playlist.creator?.userID == profile?.id else {
+            return failedBatch(songs, message: LibraryOperationError.playlistIsNotOwned.localizedDescription)
+        }
+        return await performSongBatch(uniqueFavoriteSongs(songs)) { song in
+            try await self.add(song: song, to: playlist)
+        }
+    }
+
+    private func performSongBatch(
+        _ songs: [Song],
+        operation: (Song) async throws -> Void
+    ) async -> LibrarySongBatchResult {
+        guard isLoggedIn else {
+            return failedBatch(songs, message: APIError.notLoggedIn.localizedDescription)
+        }
+        let scope = api.accountScope
+        var succeeded: [Int] = []
+        var failures: [LibrarySongBatchResult.Failure] = []
+        for (index, song) in songs.enumerated() {
+            do {
+                try Task.checkCancellation()
+                guard api.accountScope == scope else { throw CancellationError() }
+                try await operation(song)
+                guard api.accountScope == scope else { throw CancellationError() }
+                succeeded.append(song.id)
+            } catch is CancellationError {
+                let message = L10n.string("ui.library.edit.operation_interrupted")
+                failures.append(contentsOf: songs[index...].map { .init(songID: $0.id, message: message) })
+                break
+            } catch {
+                failures.append(.init(songID: song.id, message: error.localizedDescription))
+                if let error = error as? QQMusicError,
+                   error.isAuthenticationFailure || error.isRateLimited {
+                    failures.append(contentsOf: songs.dropFirst(index + 1).map {
+                        .init(songID: $0.id, message: error.localizedDescription)
+                    })
+                    break
+                }
+            }
+        }
+        return LibrarySongBatchResult(succeededSongIDs: succeeded, failures: failures)
+    }
+
+    private func failedBatch(_ songs: [Song], message: String) -> LibrarySongBatchResult {
+        LibrarySongBatchResult(
+            succeededSongIDs: [],
+            failures: uniqueFavoriteSongs(songs).map { .init(songID: $0.id, message: message) }
+        )
+    }
+
     func clearAccountData() {
         if let cookie = loadedCookie {
             let cache = api.pageContentCache
@@ -673,6 +871,13 @@ final class LibraryStore {
 
     private func clearRemoteContent() {
         lastSuccessfulRefresh = nil
+        favoriteContentRevision &+= 1
+        favoriteSongOrder = nil
+        qqFavoriteSongsHaveMore = false
+        favoriteOrderErrorMessage = nil
+        pendingFavoriteSongIDs.removeAll()
+        isPerformingFavoriteBatch = false
+        favoriteBatchID = nil
         favoriteSongPageLoadTask?.cancel()
         favoriteSongPageLoadTask = nil
         favoriteSongPageLoadID = nil
@@ -705,10 +910,16 @@ final class LibraryStore {
         _ song: Song,
         isLiked: Bool
     ) {
+        guard contains(song: song) != isLiked else { return }
+        favoriteContentRevision &+= 1
+        favoriteSongPageLoadTask?.cancel()
+        favoriteSongPageLoadTask = nil
+        favoriteSongPageLoadID = nil
+        isLoadingMoreFavoriteSongs = false
         if let index = favoriteSongIDs.firstIndex(of: song.id) {
             favoriteSongIDs.remove(at: index)
             if index < favoriteSongsNextOffset {
-                favoriteSongsNextOffset -= 1
+                favoriteSongsNextOffset = max(favoriteSongsNextOffset - 1, 0)
             }
         }
         favoriteSongIDSet.remove(song.id)
@@ -720,8 +931,47 @@ final class LibraryStore {
             favoriteSongs.insert(song, at: 0)
             favoriteSongsNextOffset += 1
         }
-        favoriteSongTotalCount = favoriteSongIDs.count
+        favoriteSongTotalCount = max(
+            favoriteSongTotalCount + (isLiked ? 1 : -1),
+            favoriteSongIDs.count
+        )
+        if let order = favoriteSongOrder {
+            persistFavoriteSongOrder(isLiked ? order.adding(song.id) : order.removing(song.id))
+        }
         persistContentInBackground()
+    }
+
+    private func uniqueFavoriteSongs(_ songs: [Song]) -> [Song] {
+        var seen: Set<Int> = []
+        return songs.filter { $0.id > 0 && seen.insert($0.id).inserted }
+    }
+
+    private func loadFavoriteSongOrder(accountScope: String) {
+        do {
+            favoriteSongOrder = try orderStore.load(accountScope: accountScope)
+            favoriteOrderErrorMessage = nil
+        } catch {
+            favoriteOrderErrorMessage = L10n.format("ui.library.edit.order_read_detail", error.localizedDescription)
+        }
+    }
+
+    private func reconcileFavoriteSongOrder(isComplete: Bool) {
+        guard let order = favoriteSongOrder else { return }
+        let reconciled = order.reconciled(with: favoriteSongIDs, isComplete: isComplete)
+        guard reconciled != order else { return }
+        persistFavoriteSongOrder(reconciled)
+    }
+
+    private func persistFavoriteSongOrder(_ order: FavoriteSongOrder) {
+        let scope = api.accountScope
+        guard !scope.isEmpty, loadedCookie == scope else { return }
+        do {
+            try orderStore.save(order, accountScope: scope)
+            favoriteSongOrder = order
+            favoriteOrderErrorMessage = nil
+        } catch {
+            favoriteOrderErrorMessage = L10n.format("ui.library.edit.order_save_failed", error.localizedDescription)
+        }
     }
 
     private func setLocalPodcast(
@@ -757,8 +1007,10 @@ final class LibraryStore {
         favoriteSongs = snapshot.favoriteSongs
         favoriteSongIDs = snapshot.favoriteSongIDs
         favoriteSongIDSet = Set(snapshot.favoriteSongIDs)
-        favoriteSongTotalCount = snapshot.favoriteSongIDs.count
+        favoriteSongTotalCount = snapshot.favoriteSongTotalCount ?? snapshot.favoriteSongIDs.count
         favoriteSongsNextOffset = snapshot.favoriteSongsNextOffset
+        qqFavoriteSongsHaveMore = snapshot.favoriteSongsHaveMore
+            ?? (favoriteSongsNextOffset < favoriteSongTotalCount)
         favoritePlaylists = snapshot.favoritePlaylists
         favoriteAlbums = snapshot.favoriteAlbums
         favoriteArtists = snapshot.favoriteArtists
@@ -785,6 +1037,8 @@ final class LibraryStore {
             favoriteSongs: favoriteSongs,
             favoriteSongIDs: favoriteSongIDs,
             favoriteSongsNextOffset: favoriteSongsNextOffset,
+            favoriteSongTotalCount: favoriteSongTotalCount,
+            favoriteSongsHaveMore: hasMoreFavoriteSongs,
             favoritePlaylists: favoritePlaylists,
             favoriteAlbums: favoriteAlbums,
             favoriteArtists: favoriteArtists,
@@ -816,11 +1070,14 @@ final class LibraryStore {
 
 private enum LibraryOperationError: LocalizedError {
     case playlistIsNotOwned
+    case favoriteSongsIncomplete(String)
 
     var errorDescription: String? {
         switch self {
         case .playlistIsNotOwned:
             L10n.string("ui.library.error.owned_playlist_only")
+        case .favoriteSongsIncomplete(let message):
+            message
         }
     }
 }

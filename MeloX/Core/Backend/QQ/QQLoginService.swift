@@ -72,10 +72,18 @@ final class QQLoginService {
     private let blocker = QQRedirectBlocker()
     private let session: URLSession
     private let cookieStorage: HTTPCookieStorage
+    private let ownsSession: Bool
     private let userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-    init() {
+    init(session injectedSession: URLSession? = nil) {
+        if let injectedSession {
+            session = injectedSession
+            cookieStorage = injectedSession.configuration.httpCookieStorage ?? .shared
+            ownsSession = false
+            return
+        }
+        ownsSession = true
         let storage = HTTPCookieStorage.shared
         storage.cookieAcceptPolicy = .always
         cookieStorage = storage
@@ -93,7 +101,7 @@ final class QQLoginService {
     }
 
     deinit {
-        session.invalidateAndCancel()
+        if ownsSession { session.invalidateAndCancel() }
     }
 
     // MARK: - QQ QR
@@ -238,7 +246,7 @@ final class QQLoginService {
 
         var request = URLRequest(url: url, timeoutInterval: 25)
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse,
               http.statusCode == 200,
               let html = String(data: data, encoding: .utf8),
@@ -589,7 +597,7 @@ final class QQLoginService {
         )
         request.setValue("https://y.qq.com/", forHTTPHeaderField: "Referer")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse,
               (200..<300).contains(http.statusCode),
               let json = try JSONSerialization.jsonObject(with: data)

@@ -3,8 +3,9 @@ import Foundation
 extension NeteaseAPI {
     func subscribedArtists(limit: Int = 2_000) async throws -> [Artist] {
         if isUsingSourceResolver {
-            return try await qq.followedArtists(limit: limit)
-                .map(QQMusicMapper.artist)
+            return try await withQQAccountRead { client in
+                try await client.followedArtists(limit: limit)
+            }.map(QQMusicMapper.artist)
         }
         let path = "/api/artist/sublist"
         let data: [String: Any] = [

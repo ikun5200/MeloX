@@ -8,6 +8,8 @@ import XCTest
 ///     tap:<label>      first hittable element with that label or text
 ///     tapxy:<x>,<y>    a point, as fractions of the screen
 ///     hold:<label>     long press
+///     drag:<from>|<to> long press an element and drag it to another
+///     dragxy:<x1>,<y1>,<x2>,<y2> drag between screen fractions
 ///     type:<text>      into the focused field
 ///     enter            the keyboard's return key
 ///     swipe:<up|down|left|right>
@@ -41,6 +43,18 @@ final class UIRig: XCTestCase {
                 try element(argument, in: app).tap()
             case "hold":
                 try element(argument, in: app).press(forDuration: 1)
+            case "drag":
+                let labels = argument.split(separator: "|", maxSplits: 1).map(String.init)
+                guard labels.count == 2 else { throw MissingElement(label: argument) }
+                let source = try element(labels[0], in: app)
+                let target = try element(labels[1], in: app)
+                source.press(forDuration: 0.8, thenDragTo: target)
+            case "dragxy":
+                let values = argument.split(separator: ",").compactMap { Double($0) }
+                guard values.count == 4 else { throw MissingElement(label: argument) }
+                let source = app.coordinate(withNormalizedOffset: CGVector(dx: values[0], dy: values[1]))
+                let target = app.coordinate(withNormalizedOffset: CGVector(dx: values[2], dy: values[3]))
+                source.press(forDuration: 0.8, thenDragTo: target)
             case "tapxy":
                 let values = argument.split(separator: ",").compactMap {
                     Double($0)

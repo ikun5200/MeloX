@@ -70,6 +70,14 @@ final class NeteaseAPI {
     private(set) var qq: QQMusicClient
 
     @ObservationIgnored
+    let qqAccountReads = QQAccountReadCoordinator()
+
+    @ObservationIgnored
+    let qqLoginService: QQLoginService
+
+    var requiresQQRelogin: Bool { qqAccountReads.requiresRelogin }
+
+    @ObservationIgnored
     let resolver: LXPlaybackResolver?
 
     @ObservationIgnored
@@ -120,6 +128,7 @@ final class NeteaseAPI {
     ) {
         self.settings = settings
         self.resolver = resolver
+        qqLoginService = QQLoginService(session: session)
         pageContentCache = PageContentCache(settings: settings)
         client = NeteaseDirectClient(settings: settings, session: session)
         qq = QQMusicClient(
@@ -144,9 +153,15 @@ final class NeteaseAPI {
     }
 
     func updateQQCredential(_ credential: QQCredential) {
+        qqAccountReads.sessionDidChange()
         qq = qq.replacingCredential(
             credential.isValid ? credential : nil
         )
+    }
+
+    func acceptRenewedQQCredential(_ credential: QQCredential) {
+        settings.saveQQCredential(credential)
+        qq = qq.replacingCredential(credential)
     }
 
     var isUsingSourceResolver: Bool {
@@ -980,8 +995,7 @@ final class NeteaseAPI {
         likedPlaylistID: Int? = nil
     ) async throws -> [Int] {
         if isUsingSourceResolver {
-            let detail = try await qq.likedSongs(limit: 1_000)
-            return detail.songs.map(\.id)
+            return try await sourceLikedSongs().map(\.id)
         }
         if let likedPlaylistID {
             do {
@@ -1013,17 +1027,44 @@ final class NeteaseAPI {
         return response.ids
     }
 
-    func sourceLikedSongs(limit: Int = 1_000) async throws -> [Song] {
-        let detail = try await qq.likedSongs(limit: limit)
-        return detail.songs.map(QQMusicMapper.song)
+    func sourceLikedSongsPage(offset: Int = 0, limit: Int = 100) async throws -> SongCollectionPage {
+        let offset = max(offset, 0)
+        let detail = try await withQQAccountRead { client in
+            try await client.likedSongs(limit: min(max(limit, 1), 500), offset: offset)
+        }
+        let nextOffset = detail.nextOffset ?? offset + detail.songs.count
+        guard nextOffset > offset || !detail.hasMore else {
+            throw APIError.invalidResponse
+        }
+        return SongCollectionPage(
+            songs: detail.songs.map(QQMusicMapper.song),
+            nextOffset: nextOffset,
+            totalCount: detail.hasMore ? max(detail.total, nextOffset + 1) : nextOffset
+        )
+    }
+
+    func sourceLikedSongs(limit: Int = 100) async throws -> [Song] {
+        let scope = accountScope
+        var songs: [Song] = []
+        var seen: Set<Int> = []
+        var offset = 0
+        while true {
+            try Task.checkCancellation()
+            let page = try await sourceLikedSongsPage(offset: offset, limit: limit)
+            guard accountScope == scope else { throw CancellationError() }
+            songs.append(contentsOf: page.songs.filter { seen.insert($0.id).inserted })
+            guard page.hasMore else { return songs }
+            guard page.nextOffset > offset else { throw APIError.invalidResponse }
+            offset = page.nextOffset
+        }
     }
 
     func userPlaylists(userID: Int, limit: Int = 2_000) async throws -> [Playlist] {
         if isUsingSourceResolver {
             let credential = settings.qqCredential
             guard credential.isValid else { throw APIError.notLoggedIn }
-            let created = (try? await qq.createdPlaylists()) ?? []
-            let saved = (try? await qq.favoritePlaylists(limit: limit)) ?? []
+            let created = try await withQQAccountRead { try await $0.createdPlaylists() }
+            let saved = try await withQQAccountRead { try await $0.favoritePlaylists(limit: limit) }
             let createdPlaylists = created
                 .filter { $0.id > 0 && $0.dirid != 201 }
                 .map {

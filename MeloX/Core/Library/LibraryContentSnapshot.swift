@@ -8,6 +8,8 @@ struct LibraryContentSnapshot: Codable {
     let favoriteSongs: [Song]
     let favoriteSongIDs: [Int]
     let favoriteSongsNextOffset: Int
+    var favoriteSongTotalCount: Int? = nil
+    var favoriteSongsHaveMore: Bool? = nil
     let favoritePlaylists: [Playlist]
     let favoriteAlbums: [Album]
     let favoriteArtists: [Artist]

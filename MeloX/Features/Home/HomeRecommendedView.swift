@@ -23,6 +23,7 @@ struct HomeRecommendedView: View {
     @State private var activeAction: HomeQuickAction?
     @State private var actionErrorMessage: String?
     @State private var contentWidth: CGFloat = 390
+    @State private var showsHomeLayoutEditor = false
 
     private var feed: HomeRecommendationFeed {
         #if DEBUG && targetEnvironment(simulator)
@@ -95,6 +96,9 @@ struct HomeRecommendedView: View {
         } message: {
             Text(actionErrorMessage ?? L10n.string("ui.error.try_again_later"))
         }
+        .sheet(isPresented: $showsHomeLayoutEditor) {
+            NavigationStack { HomeLayoutSettingsView() }
+        }
     }
 
     @ViewBuilder
@@ -118,12 +122,16 @@ struct HomeRecommendedView: View {
     private var content: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 32) {
-                HomeQuickActionsView(
+                HomeLayoutContentView(
+                    sections: feed.sections,
+                    preferences: settings.homeLayout,
                     activeAction: activeAction,
-                    perform: perform
+                    perform: perform,
+                    onEdit: { showsHomeLayoutEditor = true }
                 )
 
-                if !hasRecommendationPayload {
+                if !hasRecommendationPayload,
+                   settings.homeLayout.modules.contains(where: { $0.isVisible && $0.id != "quickActions" }) {
                     initialState
                         .frame(
                             maxWidth: .infinity,
@@ -132,14 +140,8 @@ struct HomeRecommendedView: View {
                         .padding(.horizontal)
                         .transition(.opacity)
                 } else {
-                    ForEach(feed.sections) { section in
-                        HomeRecommendationSectionView(
-                            section: section
-                        )
-                        .transition(.opacity)
-                    }
-
-                    if feed.sections.isEmpty {
+                    if feed.sections.isEmpty,
+                       settings.homeLayout.modules.contains(where: { $0.isVisible && $0.id != "quickActions" }) {
                         ContentUnavailableView(
                             "ui.home.no_personalized_recommendations",
                             systemImage: "sparkles",
