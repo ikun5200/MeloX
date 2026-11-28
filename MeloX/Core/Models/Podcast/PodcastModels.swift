@@ -262,7 +262,7 @@ struct PodcastCategory: Decodable, Hashable, Identifiable {
     }
 }
 
-struct PodcastProgramRadio: Codable, Hashable {
+nonisolated struct PodcastProgramRadio: Codable, Hashable {
     let id: Int
     let name: String
     let picURLString: String?
@@ -296,7 +296,7 @@ struct PodcastProgramRadio: Codable, Hashable {
     }
 }
 
-struct PodcastProgram: Codable, Hashable, Identifiable {
+nonisolated struct PodcastProgram: Codable, Hashable, Identifiable {
     let id: Int
     let name: String
     let coverURLString: String?

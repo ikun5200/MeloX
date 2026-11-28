@@ -66,7 +66,9 @@ final class AutoMixPlaybackCoordinator {
         attempt = token
         preparationGeneration += 1
         let generation = preparationGeneration
-        planningTask = Task { @MainActor [weak self] in
+        // 配对分析要解码并推理两首完整歌曲，保持在 utility 优先级，
+        // 不与正在播放的解码链抢 CPU。
+        planningTask = Task(priority: .utility) { @MainActor [weak self] in
             guard let self, !Task.isCancelled else { return }
             defer {
                 if generation == preparationGeneration { planningTask = nil }

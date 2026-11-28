@@ -1,6 +1,6 @@
 import Foundation
 
-struct PlaylistContentSnapshot: Codable {
+nonisolated struct PlaylistContentSnapshot: Codable {
     let playlist: Playlist
     let loadedTrackOffset: Int
 

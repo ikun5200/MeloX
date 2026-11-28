@@ -628,7 +628,9 @@ actor AutoMixAudioAnalyzer {
             throw AutoMixAnalysisError.modelMissing
         }
         let configuration = MLModelConfiguration()
-        configuration.computeUnits = .cpuOnly
+        // 交给系统调度（含神经引擎），避免推理长期占用 CPU 核心挤压
+        // 正在播放的解码链；节拍解码对小的数值差异不敏感。
+        configuration.computeUnits = .all
         let loadedModel = try MLModel(
             contentsOf: modelURL,
             configuration: configuration

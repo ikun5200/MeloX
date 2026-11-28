@@ -12,20 +12,27 @@ final class PageContentCache {
         storage = directory.map { PageContentCacheStorage(directory: $0) } ?? .shared
     }
 
-    func value<Value: Decodable>(for key: String) async -> Value? {
+    func value<Value: Decodable & Sendable>(for key: String) async -> Value? {
         guard settings.automaticallyCachesPageContent else { return nil }
         let scope = Self.scope(for: settings.accountCacheScope)
         guard let data = await storage.data(scope: scope, key: key),
               !Task.isCancelled,
               settings.automaticallyCachesPageContent,
               scope == Self.scope(for: settings.accountCacheScope) else { return nil }
-        return try? JSONDecoder().decode(Value.self, from: data)
+        // 音乐库快照可能有上千首歌，解码不在主线程做。
+        let decode = Task.detached(priority: .utility) {
+            try? JSONDecoder().decode(Value.self, from: data)
+        }
+        return await decode.value
     }
 
-    func store<Value: Encodable>(_ value: Value, for key: String) async {
+    func store<Value: Encodable & Sendable>(_ value: Value, for key: String) async {
         guard settings.automaticallyCachesPageContent,
-              !Task.isCancelled,
-              let data = try? JSONEncoder().encode(value) else { return }
+              !Task.isCancelled else { return }
+        let encode = Task.detached(priority: .utility) {
+            try? JSONEncoder().encode(value)
+        }
+        guard let data = await encode.value else { return }
         await storage.store(data, scope: Self.scope(for: settings.accountCacheScope), key: key)
     }
 

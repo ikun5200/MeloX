@@ -22,7 +22,7 @@ struct HomePageResponse: Decodable {
     }
 }
 
-struct HomePagePayload: Codable {
+nonisolated struct HomePagePayload: Codable {
     let blocks: [HomePageBlock]
     let hasMore: Bool
     let cursor: String?
@@ -58,7 +58,7 @@ struct HomePagePayload: Codable {
     }
 }
 
-struct HomePageBlock: Codable, Identifiable {
+nonisolated struct HomePageBlock: Codable, Identifiable {
     let blockCode: String
     let showType: String?
     let uiElement: HomePageUIElement?
@@ -136,7 +136,7 @@ struct HomePageBlock: Codable, Identifiable {
     }
 }
 
-struct HomePageCreative: Codable {
+nonisolated struct HomePageCreative: Codable {
     let creativeType: String?
     let creativeID: String?
     let action: String?

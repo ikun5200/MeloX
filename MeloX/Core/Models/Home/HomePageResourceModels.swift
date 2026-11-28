@@ -1,6 +1,6 @@
 import Foundation
 
-struct HomePageResource: Codable, Identifiable {
+nonisolated struct HomePageResource: Codable, Identifiable {
     let resourceType: String?
     let resourceID: String?
     let action: String?
@@ -121,7 +121,7 @@ struct HomePageResource: Codable, Identifiable {
     }
 }
 
-struct HomePageUIElement: Codable {
+nonisolated struct HomePageUIElement: Codable {
     let mainTitle: HomePageTitle?
     let subTitle: HomePageTitle?
     let image: HomePageImage?
@@ -153,7 +153,7 @@ struct HomePageUIElement: Codable {
     }
 }
 
-struct HomePageTitle: Codable {
+nonisolated struct HomePageTitle: Codable {
     let title: String?
 
     var nonemptyTitle: String? {
@@ -166,7 +166,7 @@ struct HomePageTitle: Codable {
     }
 }
 
-struct HomePageImage: Codable {
+nonisolated struct HomePageImage: Codable {
     let imageURL: String?
 
     enum CodingKeys: String, CodingKey {
@@ -174,7 +174,7 @@ struct HomePageImage: Codable {
     }
 }
 
-struct HomePageResourceExtension: Codable {
+nonisolated struct HomePageResourceExtension: Codable {
     let artists: [Artist]
     let song: Song?
     let podcastProgram: PodcastProgram?

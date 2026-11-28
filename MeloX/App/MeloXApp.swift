@@ -24,6 +24,7 @@ struct MeloXApp: App {
     @State private var isLowPowerModeEnabled = ProcessInfo.processInfo.isLowPowerModeEnabled
 
     init() {
+        MainThreadStallMonitor.start()
         #if DEBUG && targetEnvironment(simulator)
         let settings = AppSettings(defaults: MeloXLibraryUIFixture.isEnabled ? MeloXLibraryUIFixture.defaults : .standard)
         #else

@@ -1501,8 +1501,10 @@ final class PlayerStore {
             return
         }
 
+        // 全曲分析是长时间 CPU 密集工作（解码 + CoreML），以 utility 运行，
+        // 避免以 userInteractive 抢占音频解码链造成播放欠载。
         beatAnalysisTask?.cancel()
-        beatAnalysisTask = Task {
+        beatAnalysisTask = Task(priority: .utility) {
             [weak self] in
             await self?.analyzeCurrentSongBeats()
         }

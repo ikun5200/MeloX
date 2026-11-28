@@ -171,7 +171,9 @@ open class AudioPlayer {
         entriesQueue = PlayerQueueEntries()
 
         serializationQueue = DispatchQueue(label: "streaming.core.queue", qos: .userInitiated)
-        sourceQueue = DispatchQueue(label: "source.queue", qos: .default)
+        // 源处理（数据解析、PCM 转换、填缓冲）要实时跟进播放进度，
+        // 与 serializationQueue 同级，避免被高优先级任务饿死造成欠载。
+        sourceQueue = DispatchQueue(label: "source.queue", qos: .userInitiated)
 
         entryProvider = AudioEntryProvider(
             networkingClient: NetworkingClient(),

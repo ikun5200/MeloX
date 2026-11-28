@@ -29,7 +29,7 @@ enum HomeRecommendationContent: Codable {
     }
 }
 
-struct HomeRecommendationFallback: Codable {
+nonisolated struct HomeRecommendationFallback: Codable {
     let title: HomeRecommendationTitle
     let content: HomeRecommendationContent
 }

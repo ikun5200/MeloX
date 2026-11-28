@@ -1,6 +1,6 @@
 import Foundation
 
-struct LibraryContentSnapshot: Codable {
+nonisolated struct LibraryContentSnapshot: Codable {
     static let cacheKey = "library.v1"
 
     let profile: AccountProfile

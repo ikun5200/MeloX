@@ -122,7 +122,10 @@ final class AudioPlaybackDeck: NSObject, @preconcurrency AudioPlayerDelegate {
         let player = AudioStreaming.AudioPlayer(
             configuration: AudioPlayerConfiguration(
                 bufferSizeInSeconds: max(source.preferredForwardBufferDuration, 8),
-                secondsRequiredToStartPlaying: 0.3, gracePeriodAfterSeekInSeconds: 0.1),
+                secondsRequiredToStartPlaying: 0.3, gracePeriodAfterSeekInSeconds: 0.1,
+                // 欠载后多攒几秒再恢复：吞吐贴地飞行时 1 秒会立刻再饿，
+                // 反复欠载听起来就像低倍速、掉帧。
+                secondsRequiredToStartPlayingAfterBufferUnderrun: 3),
             outputFormat: format)
         self.player = player
         channelCount = format?.channelCount ?? 2
@@ -142,7 +145,8 @@ final class AudioPlaybackDeck: NSObject, @preconcurrency AudioPlayerDelegate {
 
     func play() {
         wantsPlayback = true
-        if player?.state == .stopped { seek(to: 0) }
+        // stopped 时重启码流；保留暂停期间记录的 seek 目标位置。
+        if player?.state == .stopped { seek(to: initialSeek ?? 0) }
         player?.resume()
         if isReady { transition(to: .playing) }
     }
@@ -166,16 +170,27 @@ final class AudioPlaybackDeck: NSObject, @preconcurrency AudioPlayerDelegate {
 
     func seek(to seconds: TimeInterval) {
         guard let player else { initialSeek = max(seconds, 0); return }
-        isSeeking = true
         finishedPosition = nil
-        player.volume = 0
-        transition(to: .loading)
         if player.state == .stopped, let source {
-            initialSeek = max(seconds, 0)
+            // eof 之后的 stopped：只记录目标位置，不重启码流。重启会让
+            // vendor 立刻开播，再靠 wantsPlayback=false 兜底暂停，产生
+            // 一次无意义的拉流和一声杂音。真正播放时 play() 会重启。
             currentEntryID = nil
-            player.play(url: source.url, headers: source.headers)
+            initialSeek = max(seconds, 0)
+            if wantsPlayback {
+                isSeeking = true
+                player.volume = 0
+                transition(to: .loading)
+                player.play(url: source.url, headers: source.headers)
+            } else {
+                isSeeking = false
+                transition(to: .paused)
+            }
             return
         }
+        isSeeking = true
+        player.volume = 0
+        transition(to: .loading)
         player.seek(to: max(seconds, 0))
         player.resume()
     }
@@ -237,8 +252,13 @@ final class AudioPlaybackDeck: NSObject, @preconcurrency AudioPlayerDelegate {
         // The vendor posts delegate events to the main queue. A buffering or
         // paused event from preroll can arrive after this same player resumed.
         guard player === self.player, player.state == newState else { return }
+        if newState != previous {
+            // 欠载证据：播放中出现 bufferring 说明环形缓冲耗尽。
+            rigTrace("deck", "state \(previous) -> \(newState)")
+        }
         switch newState {
         case .playing:
+            rigTrace("deck", "playing event wants=\(wantsPlayback) seeking=\(isSeeking) initial=\(String(describing: initialSeek)) vendorSeeking=\(player.isSeeking)")
             guard initialSeek == nil, !player.isSeeking, finishedPosition == nil, error == nil else { return }
             let completedSeek = isSeeking
             isSeeking = false

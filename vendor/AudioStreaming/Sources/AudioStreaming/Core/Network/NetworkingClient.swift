@@ -54,7 +54,8 @@ final class NetworkingClient {
 
     init(configuration: URLSessionConfiguration = .networkingConfiguration,
          delegate: NetworkSessionDelegate = NetworkSessionDelegate(),
-         networkQueue: DispatchQueue = DispatchQueue(label: "audio.streaming.session.network.queue"))
+         networkQueue: DispatchQueue = DispatchQueue(label: "audio.streaming.session.network.queue",
+                                                     qos: .userInitiated))
     {
         let delegateQueue = operationQueue(underlyingQueue: networkQueue)
         let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: delegateQueue)
@@ -132,7 +133,9 @@ extension NetworkingClient: StreamTaskProvider {
 
 private func operationQueue(underlyingQueue: DispatchQueue) -> OperationQueue {
     let delegateQueue = OperationQueue()
-    delegateQueue.qualityOfService = .default
+    // 网络回调驱动整条解码链，必须跟上实时播放节奏；
+    // 提到 userInitiated 防止在 CPU 争抢时被更高优先级任务饿死。
+    delegateQueue.qualityOfService = .userInitiated
     delegateQueue.maxConcurrentOperationCount = 1
     delegateQueue.underlyingQueue = underlyingQueue
     delegateQueue.name = "com.decimal.session.delegate.queue"

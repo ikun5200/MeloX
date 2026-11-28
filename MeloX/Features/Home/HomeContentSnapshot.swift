@@ -1,6 +1,6 @@
 import Foundation
 
-struct HomeContentSnapshot: Codable {
+nonisolated struct HomeContentSnapshot: Codable {
     let payload: HomePagePayload
     let charts: [Playlist]
     let fallbacks: [HomeRecommendationSlot: HomeRecommendationFallback]

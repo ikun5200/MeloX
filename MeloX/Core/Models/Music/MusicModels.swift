@@ -368,7 +368,7 @@ nonisolated struct Song: Codable, Hashable, Identifiable {
     }
 }
 
-struct UserSummary: Codable, Hashable {
+nonisolated struct UserSummary: Codable, Hashable {
     let userID: Int
     let nickname: String
 
@@ -393,11 +393,11 @@ struct UserSummary: Codable, Hashable {
     }
 }
 
-struct TrackReference: Codable, Hashable {
+nonisolated struct TrackReference: Codable, Hashable {
     let id: Int
 }
 
-struct Playlist: Codable, Hashable, Identifiable {
+nonisolated struct Playlist: Codable, Hashable, Identifiable {
     let id: Int
     let dirid: Int
     let name: String
